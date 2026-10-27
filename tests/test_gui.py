@@ -66,3 +66,40 @@ def test_app_cycle(tmp_path):
     w.close()
     from PySide6.QtCore import QThreadPool
     QThreadPool.globalInstance().waitForDone(30000)  # let background jobs (printer queries) finish
+
+
+def test_multipage_pdf(tmp_path, monkeypatch):
+    """Every page of a PDF is converted, printed to PDF and revealed; long PDFs ask first."""
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    from inkhue.gui import main, media
+    from inkhue.gui.main import Printer
+
+    y, x = np.mgrid[0:240, 0:360] / np.array([240, 360])[:, None, None]
+    photos = [(np.stack([1 - x, y, x * y], -1) * 255).astype(np.uint8),
+              (np.stack([x, 1 - y, y], -1) * 255).astype(np.uint8)]
+    src = tmp_path / "two.pdf"
+    media.save_color(photos, src)
+    assert media.page_count(src) == 2
+
+    w = Printer()
+    w.fill.setChecked(False)
+    w.width_in.setValue(2.5)
+    w.feed(str(src))
+    _wait(app, lambda: len(w.pages) == 2 and not w.busy)
+    assert "2 PAGES" in w.lcd.text()
+    media.export_pdf(w.pages, w.page_dpi, "US Letter", tmp_path / "pages.pdf")
+    assert media.page_count(tmp_path / "pages.pdf") == 2
+
+    w.test_cycle()
+    _wait(app, lambda: len(w.colors) == 2 and not w.busy)
+    assert "ALL 2 PAGES" in w.lcd.text()
+    w.turn(1)
+    assert w.at == 1 and "2 OF 2" in w.tray_out.paper.caption
+    media.save_color(w.colors, tmp_path / "out.png")
+    assert (tmp_path / "out-1.png").exists() and (tmp_path / "out-2.png").exists()
+
+    monkeypatch.setattr(main, "MANY_PAGES", 1)  # pretend two pages is a lot, and say Cancel
+    asked = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "exec", lambda box: asked.append(box.text()))
+    assert w.count_pages(str(src)) is None and "2 pages" in asked[0]
+    w.close()
