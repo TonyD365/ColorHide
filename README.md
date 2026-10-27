@@ -41,32 +41,34 @@ can read the color back out. No secret key, nothing encrypted — the format is 
 - 💾 Export the recovered photo as **PDF, PNG, JPEG, TIFF, WebP, HEIC, JPEG 2000, BMP**…
 - 🧠 Optional **neural refiner** (small U-Net, runs on CPU via ONNX Runtime) removes grain and sharpens color
 - 🛡️ Reed-Solomon error correction + redundancy survive smudges, skew and scanner noise
-- 🔄 **Auto-updates** from the latest GitHub release, verified by SHA-256
+- 📦 Real **installers**: `.pkg` into Applications on macOS, `setup.exe` on Windows, `.deb` on Ubuntu/Debian
+- 🔄 **Auto-updates** from the latest GitHub release with the same installers, verified by SHA-256
 
 ## Download
 
-| Platform | File |
-|---|---|
-| macOS (Apple silicon) | `ColorHide-vX.Y.Z-macos-arm64.zip` |
-| macOS (Intel) | `ColorHide-vX.Y.Z-macos-x64.zip` |
-| Windows 10/11 (64-bit) | `ColorHide-vX.Y.Z-windows-x64.zip` |
-| Linux (x86-64) | `ColorHide-vX.Y.Z-linux-x64.tar.gz` |
+| Platform | Installer | Installs to |
+|---|---|---|
+| macOS (Apple silicon) | `ColorHide-vX.Y.Z-macos-arm64.pkg` | `/Applications` |
+| macOS (Intel) | `ColorHide-vX.Y.Z-macos-x64.pkg` | `/Applications` |
+| Windows 10/11 (64-bit) | `ColorHide-vX.Y.Z-windows-x64-setup.exe` | your user's programs folder (or *Program Files* for all users), Start-menu entry, uninstaller |
+| Ubuntu / Debian (x86-64) | `ColorHide-vX.Y.Z-linux-x64.deb` | `/opt/ColorHide`, app-menu entry, `colorhide` command |
 
 Get them from the [latest release](https://github.com/TonyD365/ColorHide/releases/latest). Every file has a
 SHA-256 in `SHA256SUMS.txt` and a [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)
 (`gh attestation verify <file> -R TonyD365/ColorHide`).
 
 <details>
-<summary><b>First launch: the apps are not code-signed by a paid certificate</b></summary>
+<summary><b>Installing: the installers are not code-signed by a paid certificate</b></summary>
 
-**macOS** — unzip, move `ColorHide.app` to Applications and open it. macOS will refuse the first time.
-Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. You only do this once;
-later updates install without asking. (Terminal alternative: `xattr -dr com.apple.quarantine /Applications/ColorHide.app`.)
+**macOS** — open the `.pkg`. The first time, macOS refuses it: open **System Settings → Privacy & Security**,
+scroll down, click **Open Anyway**, then follow the installer. ColorHide lands in **Applications**. You only do this
+once; updates install by themselves, without a password.
 
-**Windows** — unzip anywhere and run `ColorHide.exe`. If SmartScreen appears, click **More info → Run anyway**.
+**Windows** — run the `setup.exe`. If SmartScreen appears, click **More info → Run anyway**. No administrator rights
+needed unless you choose to install for all users.
 
-**Linux** — `tar xzf ColorHide-*.tar.gz && ./ColorHide/ColorHide`. Needs a desktop with X11 or Wayland;
-on minimal systems install `libxcb-cursor0`. Scanning uses SANE (`sudo apt install sane-utils`).
+**Ubuntu / Debian** — `sudo apt install ./ColorHide-*.deb` (or double-click it). Then start *ColorHide* from the app
+menu or run `colorhide`. Scanning uses SANE (`sudo apt install sane-utils`); updates ask for your password.
 </details>
 
 ## How it works

@@ -1,9 +1,14 @@
-"""Self-update from GitHub Releases.
+"""Self-update from GitHub Releases, using the same installers people download.
 
 The release marked "Latest" on GitHub is the update channel; its tag (v1.2.3) is the version.
-Flow: check -> download this platform's archive -> verify against SHA256SUMS.txt -> unpack to a
-staging folder -> after the app exits, a small helper script swaps the install folder and relaunches.
-Archives are fetched by the app itself (not a browser), so macOS adds no quarantine flag and the
+Flow: check -> download this platform's installer -> verify against SHA256SUMS.txt -> after the app
+exits, a small helper installs it and relaunches the app:
+  macOS    .pkg  The installer made the app the user's own, so the helper unpacks the .pkg and swaps
+                 the bundle in place: no password. If that isn't possible it runs the .pkg with the
+                 system's administrator prompt.
+  Windows  .exe  The Inno Setup installer runs silently (/UPDATE relaunches the app afterwards).
+  Linux    .deb  Installed with `pkexec dpkg -i` (the desktop's password prompt).
+Installers are fetched by the app itself (not a browser), so macOS adds no quarantine flag and the
 user approves Gatekeeper only once, on first install.
 """
 import hashlib
@@ -13,10 +18,8 @@ import platform
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 import urllib.request
-import zipfile
 from pathlib import Path
 
 from ._version import __version__
@@ -44,9 +47,14 @@ def platform_key():
     return f"linux-{arch}"
 
 
-def archive_name(tag):
-    ext = "tar.gz" if sys.platform.startswith("linux") else "zip"
-    return f"ColorHide-{tag}-{platform_key()}.{ext}"
+def installer_name(tag):
+    """Must match what .github/workflows/release.yml uploads."""
+    key = platform_key()
+    if sys.platform == "darwin":
+        return f"ColorHide-{tag}-{key}.pkg"
+    if sys.platform == "win32":
+        return f"ColorHide-{tag}-{key}-setup.exe"
+    return f"ColorHide-{tag}-{key}.deb"
 
 
 def frozen():
@@ -83,7 +91,7 @@ def check():
     if rel.get("draft") or rel.get("prerelease") or parse_version(tag) <= parse_version(__version__):
         return None
     assets = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
-    name = archive_name(tag)
+    name = installer_name(tag)
     # SHA256SUMS.txt is uploaded last by CI, so its presence means the build is complete
     if name not in assets or "SHA256SUMS.txt" not in assets:
         return None
@@ -91,10 +99,10 @@ def check():
 
 
 def download(info, progress=None):
-    """Download and verify; return the staged new app path (ready for apply())."""
+    """Download and verify the installer; return its path (ready for apply())."""
     work = Path(tempfile.mkdtemp(prefix="colorhide-update-"))
-    archive = work / info["name"]
-    with _get(info["url"], "application/octet-stream") as r, open(archive, "wb") as f:
+    installer = work / info["name"]
+    with _get(info["url"], "application/octet-stream") as r, open(installer, "wb") as f:
         total, done = int(r.headers.get("Content-Length") or 0), 0
         h = hashlib.sha256()
         while chunk := r.read(1 << 16):
@@ -107,49 +115,68 @@ def download(info, progress=None):
         sums = dict(line.split()[::-1] for line in r.read().decode().splitlines() if line.strip())
     if sums.get(info["name"]) != h.hexdigest():
         raise RuntimeError("update failed its SHA-256 check; not installed")
-
-    stage = work / "stage"
-    if archive.name.endswith(".tar.gz"):
-        with tarfile.open(archive) as t:
-            t.extractall(stage, filter="data")
-    elif sys.platform == "darwin":
-        stage.mkdir()
-        subprocess.run(["ditto", "-x", "-k", str(archive), str(stage)], check=True)  # keeps symlinks + signature
-    else:
-        with zipfile.ZipFile(archive) as z:
-            z.extractall(stage)
-    new = next(stage.iterdir())
-    return new
+    return installer
 
 
-def apply(new_app):
-    """Start a detached helper that waits for this process to exit, swaps in the new version and relaunches."""
-    target = install_path()
-    pid = os.getpid()
+def _q(path):
+    """Single-quote for /bin/sh."""
+    return "'" + str(path).replace("'", "'\\''") + "'"
+
+
+def helper_script(installer, pid, target):
+    """The script that runs after the app has quit. Separate so it can be tested."""
     if sys.platform == "win32":
-        script = Path(tempfile.mkdtemp()) / "update.bat"
-        script.write_text(f"""@echo off
+        return f"""@echo off
 :wait
 tasklist /FI "PID eq {pid}" | find "{pid}" >nul && (timeout /t 1 /nobreak >nul & goto wait)
-rmdir /s /q "{target}.old" 2>nul
-move "{target}" "{target}.old" >nul
-move "{new_app}" "{target}" >nul
-rmdir /s /q "{target}.old" 2>nul
-start "" "{target}\\ColorHide.exe"
-""")
+"{installer}" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /UPDATE
+"""
+    wait = f"while kill -0 {pid} 2>/dev/null; do sleep 0.5; done\n"
+    if sys.platform == "darwin":
+        t, pkg = _q(target), _q(installer)
+        admin = (f"/usr/bin/osascript -e 'do shell script \"/usr/sbin/installer -pkg \" & quoted form of "
+                 f"\"{installer}\" & \" -target /\" with administrator privileges'")
+        return wait + f"""T={t}
+OK=
+if [ -O "$T" ] && [ -w "$(dirname "$T")" ]; then
+    X=$(mktemp -d)
+    if /usr/sbin/pkgutil --expand-full {pkg} "$X/pkg" && [ -d "$X/pkg/ColorHide.pkg/Payload/ColorHide.app" ]; then
+        rm -rf "$T.old"
+        if mv "$T" "$T.old"; then  # only touch the old app once it is safely set aside
+            if /usr/bin/ditto "$X/pkg/ColorHide.pkg/Payload/ColorHide.app" "$T"; then
+                OK=1
+                rm -rf "$T.old"
+            else
+                rm -rf "$T"
+                mv "$T.old" "$T"
+            fi
+        fi
+    fi
+    rm -rf "$X"
+fi
+if [ -z "$OK" ]; then
+    {admin} && T=/Applications/ColorHide.app
+fi
+/usr/bin/open "$T"
+"""
+    return wait + f"""if command -v pkexec >/dev/null 2>&1 && pkexec dpkg -i {_q(installer)}; then
+    nohup /opt/ColorHide/ColorHide >/dev/null 2>&1 &
+else
+    xdg-open https://github.com/{REPO}/releases/latest
+fi
+"""
+
+
+def apply(installer):
+    """Start a detached helper that waits for this process to exit, installs and relaunches."""
+    script = Path(tempfile.mkdtemp()) / ("update.bat" if sys.platform == "win32" else "update.sh")
+    script.write_text(helper_script(installer, os.getpid(), install_path()))
+    if sys.platform == "win32":
         subprocess.Popen(["cmd", "/c", str(script)], creationflags=0x08000000 | 0x00000008)  # no window, detached
     else:
-        relaunch = f'open "{target}"' if sys.platform == "darwin" else f'nohup "{target}/ColorHide" >/dev/null 2>&1 &'
-        script = Path(tempfile.mkdtemp()) / "update.sh"
-        script.write_text(f"""#!/bin/sh
-while kill -0 {pid} 2>/dev/null; do sleep 0.5; done
-rm -rf "{target}.old"
-mv "{target}" "{target}.old" && mv "{new_app}" "{target}" && rm -rf "{target}.old"
-{relaunch}
-""")
         script.chmod(0o755)
         subprocess.Popen(["/bin/sh", str(script)], start_new_session=True)
 
 
-def discard(new_app):
-    shutil.rmtree(Path(new_app).parents[1], ignore_errors=True)
+def discard(installer):
+    shutil.rmtree(Path(installer).parent, ignore_errors=True)

@@ -1,6 +1,7 @@
 # Checks every pull request and every push to main:
 #   lint -> tests on macOS / Windows / Linux (incl. the real app window, headless)
 #   -> packaged-app self-test -> codec benchmark vs. the base branch (posted on the PR)
+#   -> for PRs that touch packaging: every installer built, installed and self-tested (release.yml)
 name: CI
 
 on:
@@ -129,3 +130,45 @@ jobs:
       - name: Fail if decoding got worse
         if: github.event_name == 'pull_request'
         run: python head/scripts/benchmark.py --compare base.json head.json --fail-on-regression > /dev/null
+
+  changes:
+    name: Detect packaging changes
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      packaging: ${{ steps.files.outputs.packaging }}
+    steps:
+      - id: files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          hit=false
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            gh pr diff ${{ github.event.pull_request.number }} --repo "$GITHUB_REPOSITORY" --name-only \
+              | grep -qE '^(packaging/|\.github/workflows/release\.yml|colorhide/updater\.py|requirements-app\.txt)' \
+              && hit=true
+          fi
+          echo "packaging=$hit" | tee -a "$GITHUB_OUTPUT"
+
+  installer-builds:
+    needs: [lint, changes]
+    if: needs.changes.outputs.packaging == 'true'
+    uses: ./.github/workflows/release.yml
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+
+  installers:
+    # the required check: green when packaging is untouched, or when all installers installed and self-tested
+    name: Installers
+    needs: [changes, installer-builds]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          echo "changes: ${{ needs.changes.result }}, installer builds: ${{ needs.installer-builds.result }}"
+          [ "${{ needs.changes.result }}" = success ] || exit 1
+          case "${{ needs.installer-builds.result }}" in success|skipped) ;; *) exit 1 ;; esac
