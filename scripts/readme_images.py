@@ -61,31 +61,50 @@ def compare():
     canvas.save(ASSETS / "compare.png", optimize=True)
 
 
-def screenshot():
-    from PySide6.QtCore import QTimer
+def screenshot(version=None):
+    """assets/screenshot.png: the app right after revealing the color (waits for the work to finish,
+    not for a fixed time). `version` sets the version shown on the printer, e.g. the latest release."""
+    import time
+
     from PySide6.QtWidgets import QApplication
 
-    from inkhue.gui.main import Printer
-    app = QApplication([])
-    w = Printer()
-    w.resize(1000, 880)
+    from inkhue import _version
+    if version:
+        _version.__version__ = version
+    from inkhue.gui import main as gui_main
+    gui_main.__version__ = _version.__version__
+    app = QApplication.instance() or QApplication([])
+    w = gui_main.Printer()
+    w.resize(1000, 900)
     w.show()
+
+    def wait(cond, timeout=300):
+        end = time.time() + timeout
+        while not cond():
+            if time.time() > end:
+                raise TimeoutError("app did not finish")
+            app.processEvents()
+            time.sleep(0.05)
+
     src = ASSETS / "_coffee.png"
     cv2.imwrite(str(src), cv2.cvtColor(data.coffee(), cv2.COLOR_RGB2BGR))
-    steps = iter([lambda: w.feed(str(src))] + [None] * 6 + [lambda: w.test_cycle()] + [None] * 9 +
-                 [lambda: (w.grab().save(str(ASSETS / "screenshot.png")), src.unlink(), app.quit())])
-
-    def tick():
-        s = next(steps)
-        if s:
-            s()
-
-    t = QTimer()
-    t.timeout.connect(tick)
-    t.start(700)
-    app.exec()
-
-
+    try:
+        w.fill.setChecked(False)  # a moderate page keeps this quick; the picture looks the same
+        w.width_in.setValue(6.0)
+        w.feed(str(src))
+        wait(lambda: w.page is not None and not w.busy)
+        w.test_cycle()
+        wait(lambda: w.color is not None and not w.busy)
+        assert "COLOR RESTORED" in w.lcd.text(), w.lcd.text()
+        for _ in range(40):  # let the sheet finish sliding out of the printer
+            app.processEvents()
+            time.sleep(0.05)
+        w.width_in.clearFocus()
+        app.processEvents()
+        w.grab().save(str(ASSETS / "screenshot.png"))
+    finally:
+        src.unlink(missing_ok=True)
+        w.close()
 
 
 def reveal_gif(width=540, frames=16):
@@ -178,5 +197,7 @@ if __name__ == "__main__":
     reveal_gif()
     gallery()
     document_demo()
-    screenshot()
+    import subprocess
+    tag = subprocess.run(["git", "describe", "--tags", "--abbrev=0"], capture_output=True, text=True).stdout.strip()
+    screenshot(tag.lstrip("v") or None)  # show the released version, not 0.0.0-dev
     print("wrote assets/compare.png, reveal.gif, gallery.png, screenshot.png")

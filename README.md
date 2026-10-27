@@ -59,6 +59,8 @@ Photos: public domain / CC0 (NASA, scikit-image).</sub>
 
 Upside down, a little crooked, written on? All fine.
 
+<div align="center"><img src="assets/screenshot.png" width="720" alt="The Inkhue app after revealing the color of a scanned page"></div>
+
 ## Features
 
 - 🖨️ **Printer-style app** for macOS, Windows and Linux

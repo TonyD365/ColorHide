@@ -43,6 +43,8 @@
 
 纸放反了、放歪了、写过字？都没关系。
 
+<div align="center"><img src="assets/screenshot.png" width="720" alt="Inkhue 应用：扫描后还原出彩色"></div>
+
 ## 安装
 
 | 系统 | 安装包 | 安装位置 |
