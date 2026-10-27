@@ -1,12 +1,14 @@
 <div align="center">
 
-<img src="assets/icon.png" width="120" alt="ColorHide 图标">
+<img src="assets/icon.png" width="120" alt="Inkhue 图标">
 
-# ColorHide
+# Inkhue
 
 **把彩色照片打印成看起来普通的黑白照片；扫描后，颜色又回来了。**
 
-[English](README.md) · [下载](https://github.com/TonyD365/ColorHide/releases/latest)
+[English](README.md) · [下载](https://github.com/TonyD365/Inkhue/releases/latest)
+
+<img src="assets/reveal.gif" width="540" alt="黑白打印件被扫描还原成彩色">
 
 <img src="assets/compare.png" alt="原图、黑白打印件、扫描还原的彩色">
 
@@ -14,8 +16,14 @@
 
 ## 这是什么
 
-黑白打印便宜又随处可见，彩色打印却不是。ColorHide 把照片的颜色藏在**打印网点的微观排列**里：
+黑白打印便宜又随处可见，彩色打印却不是。Inkhue 把照片的颜色藏在**打印网点的微观排列**里：
 肉眼看到的只是一张普通的灰度照片，扫描仪却能把颜色读回来。没有密钥，也不加密，格式完全公开，任何人都能解码。
+
+## 效果展示
+
+<div align="center"><img src="assets/gallery.png" alt="三组示例：原图、黑白打印、还原的彩色"></div>
+
+<sub>原图 · 打印出来的黑白页 · 扫描还原的彩色。最下面一组在打印件上用笔写过字：颜色照样能还原，笔迹也会原样保留。照片为公有领域 / CC0。</sub>
 
 ## 功能
 
@@ -31,19 +39,19 @@
 
 ## 安装
 
-从 [Releases](https://github.com/TonyD365/ColorHide/releases/latest) 下载对应系统的安装包：
+从 [Releases](https://github.com/TonyD365/Inkhue/releases/latest) 下载对应系统的安装包：
 
 | 系统 | 安装包 | 安装位置 |
 |---|---|---|
-| macOS（Apple 芯片 / Intel） | `ColorHide-版本-macos-arm64.pkg` / `-macos-x64.pkg` | 「应用程序」文件夹 |
-| Windows 10/11 | `ColorHide-版本-windows-x64-setup.exe` | 当前用户的程序目录（也可选所有用户），带开始菜单和卸载程序 |
-| Ubuntu / Debian | `ColorHide-版本-linux-x64.deb` | `/opt/ColorHide`，带应用菜单图标 |
+| macOS（Apple 芯片 / Intel） | `Inkhue-版本-macos-arm64.pkg` / `-macos-x64.pkg` | 「应用程序」文件夹 |
+| Windows 10/11 | `Inkhue-版本-windows-x64-setup.exe` | 当前用户的程序目录（也可选所有用户），带开始菜单和卸载程序 |
+| Ubuntu / Debian | `Inkhue-版本-linux-x64.deb` | `/opt/Inkhue`，带应用菜单图标 |
 
 **macOS**：打开 `.pkg`，第一次会被系统拦截。到「系统设置 → 隐私与安全性」往下找到「仍要打开」，然后按安装器提示完成，应用会装进「应用程序」。只需要一次，之后的自动更新不用输密码。
 
 **Windows**：运行 `setup.exe`。如果出现 SmartScreen 提示，点「更多信息 → 仍要运行」。
 
-**Ubuntu / Debian**：`sudo apt install ./ColorHide-*.deb`，或直接双击安装。扫描功能需要 `sudo apt install sane-utils`；自动更新时会请你输入密码。
+**Ubuntu / Debian**：`sudo apt install ./Inkhue-*.deb`，或直接双击安装。扫描功能需要 `sudo apt install sane-utils`；自动更新时会请你输入密码。
 
 ## 打印和扫描建议
 

@@ -23,7 +23,10 @@ from skimage import color as skcolor
 from skimage import data as skdata
 from skimage.metrics import structural_similarity
 
-from colorhide import api, channel, codec, halftone, layout, payload
+try:
+    from inkhue import api, channel, codec, halftone, layout, payload
+except ImportError:  # CI runs this script against the base branch too, which may predate the rename
+    from colorhide import api, channel, codec, halftone, layout, payload
 
 # scikit-image sample photos: public domain / CC0
 IMAGES = ["astronaut", "coffee", "chelsea", "rocket"]
@@ -189,7 +192,7 @@ def compare(base_path, head_path):
     base, head = summarize(json.load(open(base_path))), summarize(json.load(open(head_path)))
     regressions = [c for c in CONDITIONS if head[c]["success"] is not None and base[c]["success"] is not None
                    and head[c]["success"] < base[c]["success"]]
-    md = ["<!-- colorhide-benchmark -->", "## 📊 Codec benchmark", "",
+    md = ["<!-- inkhue-benchmark -->", "## 📊 Codec benchmark", "",
           f"{len(IMAGES)} public-domain photos × {len(SEEDS)} seeds per condition, simulated print + scan. "
           "ΔE is CIEDE2000 colour error at cell resolution (lower is better); Detail compares with the photo at 2× "
           "cell resolution. 🟢/🔴 = better/worse than the base branch.", "",

@@ -91,10 +91,10 @@ def export_pdf(page, dpi, paper, path):
     size_in = QSizeF(img.width() / dpi, img.height() / dpi)
     w = QPdfWriter(str(path))
     w.setResolution(dpi)
-    w.setCreator("ColorHide")
-    w.setTitle("ColorHide page")
+    w.setCreator("Inkhue")
+    w.setTitle("Inkhue page")
     if PAPERS[paper] is None:
-        ps = QPageSize(size_in, QPageSize.Inch, "ColorHide", QPageSize.ExactMatch)
+        ps = QPageSize(size_in, QPageSize.Inch, "Inkhue", QPageSize.ExactMatch)
         orient = QPageLayout.Portrait
     else:
         ps = QPageSize(PAPERS[paper])
@@ -140,10 +140,10 @@ def save_color(rgb, path, paper="Actual size", ppi=150):
     size_in = QSizeF(img.width() / ppi, img.height() / ppi)
     w = QPdfWriter(str(path))
     w.setResolution(ppi)
-    w.setCreator("ColorHide")
-    w.setTitle("ColorHide recovered color")
+    w.setCreator("Inkhue")
+    w.setTitle("Inkhue recovered color")
     if PAPERS[paper] is None:
-        w.setPageLayout(QPageLayout(QPageSize(size_in, QPageSize.Inch, "ColorHide", QPageSize.ExactMatch),
+        w.setPageLayout(QPageLayout(QPageSize(size_in, QPageSize.Inch, "Inkhue", QPageSize.ExactMatch),
                                     QPageLayout.Portrait, QMarginsF(0, 0, 0, 0)))
     else:
         orient = QPageLayout.Landscape if img.width() > img.height() else QPageLayout.Portrait

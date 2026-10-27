@@ -1,4 +1,4 @@
-"""Lay out a ColorHide page on a sheet of paper and paint it. One code path for the printer, for
+"""Lay out a Inkhue page on a sheet of paper and paint it. One code path for the printer, for
 "Save as PDF" and for the live preview, so the preview is exactly what comes out."""
 from dataclasses import dataclass, field
 
@@ -69,7 +69,7 @@ def place(page_in: QSizeF, ps: QPageSize, s: SheetSettings) -> Placement:
 
 
 def header_lines(title, version, date):
-    return (date, title), (f"Scan in grayscale at 1200 dpi to reveal the color · ColorHide v{version}", "1/1")
+    return (date, title), (f"Scan in grayscale at 1200 dpi to reveal the color · Inkhue v{version}", "1/1")
 
 
 def paint(p: QPainter, res, img: QImage, img_dpi, pl: Placement, s: SheetSettings, header=None, smooth=False):
@@ -104,8 +104,8 @@ def write_pdf(path, img: QImage, dpi, ps: QPageSize, s: SheetSettings, header=No
     pl = place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s)
     w = QPdfWriter(str(path))
     w.setResolution(dpi)
-    w.setCreator("ColorHide")
-    w.setTitle("ColorHide page")
+    w.setCreator("Inkhue")
+    w.setTitle("Inkhue page")
     w.setPageLayout(page_layout(ps, pl))
     p = QPainter(w)
     paint(p, dpi, img, dpi, pl, s, header)
@@ -124,3 +124,20 @@ def preview(img_thumb: QImage, thumb_dpi, page_in: QSizeF, ps: QPageSize, s: She
     p.end()
     return out, pl
 
+
+
+def fill_width(aspect, ps: QPageSize, dpi, margins="default"):
+    """Largest print width (inches, frame included) at which a photo of `aspect` (height / width)
+    fits on `ps` at 100 % within the margins, choosing portrait or landscape, whichever is bigger."""
+    from ..halftone import K
+    from ..layout import QUIET, B
+    frame = 2 * (B + QUIET) * K / dpi  # frame + quiet zone, inches, both sides together
+    size = ps.size(QPageSize.Inch)
+    m = 2 * MARGINS_IN[margins]
+    best = 0.0
+    for aw, ah in ((size.width() - m, size.height() - m), (size.height() - m, size.width() - m)):
+        w = min(aw, (ah - frame) / aspect + frame)
+        if (w - frame) * aspect * w > (best - frame) * aspect * best:
+            best = w
+    step = 0.05  # round down so rounding of cells never pushes the page over the edge
+    return max(2.0, int((best - 0.01) / step) * step)

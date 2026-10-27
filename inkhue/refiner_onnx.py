@@ -1,6 +1,6 @@
 """Run the trained refiner with ONNX Runtime (what the released apps ship instead of PyTorch).
 
-Export from a PyTorch checkpoint:  python -m colorhide.refiner_onnx models/refiner.pt models/refiner.onnx
+Export from a PyTorch checkpoint:  python -m inkhue.refiner_onnx models/refiner.pt models/refiner.onnx
 Both model generations load: v1 (inputs dots, small -> 1x) and v2 (inputs grid, small -> 2x).
 """
 import sys
@@ -21,8 +21,13 @@ def _pad_small(small, H, W):
 
 
 def load(path):
+    import os
+
     import onnxruntime as ort
-    sess = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    opts = ort.SessionOptions()
+    opts.intra_op_num_threads = os.cpu_count() or 0  # ~25 % faster than the default on a 10-core M-series
+    # CPU on purpose: CoreML can't handle the variable image size well (100x slower when measured)
+    sess = ort.InferenceSession(str(path), opts, providers=["CPUExecutionProvider"])
     inputs = {i.name for i in sess.get_inputs()}
 
     if "grid" in inputs:

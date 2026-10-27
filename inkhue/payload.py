@@ -99,7 +99,7 @@ def _header(s, nh):
 
 
 def has_header(soft):
-    """True if these soft bits carry a valid ColorHide header: confirms the grid was read right."""
+    """True if these soft bits carry a valid Inkhue header: confirms the grid was read right."""
     perm, white = _layout(soft.size)
     nh = _hdr_bits() * HDR_REPS
     if soft.size < nh:
@@ -116,7 +116,7 @@ def decode_soft(soft, h, w):
     nh = _hdr_bits() * HDR_REPS
     hdr = _header(s, nh)
     if hdr is None:
-        raise ValueError("no ColorHide header found")
+        raise ValueError("no Inkhue header found")
     factor, qbits = hdr
     ch, cw = chroma_shape(h, w, factor)
     count = ch * cw * 2

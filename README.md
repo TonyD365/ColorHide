@@ -1,19 +1,21 @@
 <div align="center">
 
-<img src="assets/icon.png" width="132" alt="ColorHide icon">
+<img src="assets/icon.png" width="132" alt="Inkhue icon">
 
-# ColorHide
+# Inkhue
 
 **Print a color photo as a plain-looking black-and-white page. Scan it, and the color comes back.**
 
-[![Release](https://img.shields.io/github/v/release/TonyD365/ColorHide?color=ee6b33&label=release)](https://github.com/TonyD365/ColorHide/releases/latest)
-[![CI](https://img.shields.io/github/actions/workflow/status/TonyD365/ColorHide/ci.yml?branch=main&label=CI)](https://github.com/TonyD365/ColorHide/actions/workflows/ci.yml)
-[![Build](https://img.shields.io/github/actions/workflow/status/TonyD365/ColorHide/release.yml?label=release%20build)](https://github.com/TonyD365/ColorHide/actions/workflows/release.yml)
-[![Downloads](https://img.shields.io/github/downloads/TonyD365/ColorHide/total?color=6c5ce7)](https://github.com/TonyD365/ColorHide/releases)
+[![Release](https://img.shields.io/github/v/release/TonyD365/Inkhue?color=ee6b33&label=release)](https://github.com/TonyD365/Inkhue/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/TonyD365/Inkhue/ci.yml?branch=main&label=CI)](https://github.com/TonyD365/Inkhue/actions/workflows/ci.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/TonyD365/Inkhue/release.yml?label=release%20build)](https://github.com/TonyD365/Inkhue/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/github/downloads/TonyD365/Inkhue/total?color=6c5ce7)](https://github.com/TonyD365/Inkhue/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a7bd5)](LICENSE)
 ![Platforms](https://img.shields.io/badge/macOS%20·%20Windows%20·%20Linux-555)
 
 [Download](#download) · [How it works](#how-it-works) · [Printing tips](#printing-and-scanning-tips) · [Build from source](#build-from-source) · [中文说明](README.zh-CN.md)
+
+<img src="assets/reveal.gif" width="540" alt="A black-and-white printout being scanned back into color">
 
 <img src="assets/compare.png" alt="Original photo, the black-and-white printout, and the color recovered from a scan">
 
@@ -25,11 +27,19 @@
 
 ## Why
 
-Black-and-white printing is cheap and everywhere. Color is not. ColorHide stores a photo's color **inside the
+Black-and-white printing is cheap and everywhere. Color is not. Inkhue stores a photo's color **inside the
 microscopic arrangement of the printer dots**: to the eye the page is an ordinary grayscale halftone, but a scanner
 can read the color back out. No secret key, nothing encrypted — the format is open and anyone can decode it.
 
-<div align="center"><img src="assets/screenshot.png" width="760" alt="The ColorHide app"></div>
+<div align="center"><img src="assets/screenshot.png" width="760" alt="The Inkhue app"></div>
+
+## Gallery
+
+<div align="center"><img src="assets/gallery.png" alt="Original, black-and-white print and recovered color for three photos"></div>
+
+<sub>Original · what gets printed · color recovered from the scan. Bottom row: the printout was written on with a pen —
+the color still comes back, and the handwriting stays, just as it is on the paper. Photos: public domain / CC0
+(NASA, scikit-image).</sub>
 
 ## Features
 
@@ -49,27 +59,27 @@ can read the color back out. No secret key, nothing encrypted — the format is 
 
 | Platform | Installer | Installs to |
 |---|---|---|
-| macOS (Apple silicon) | `ColorHide-vX.Y.Z-macos-arm64.pkg` | `/Applications` |
-| macOS (Intel) | `ColorHide-vX.Y.Z-macos-x64.pkg` | `/Applications` |
-| Windows 10/11 (64-bit) | `ColorHide-vX.Y.Z-windows-x64-setup.exe` | your user's programs folder (or *Program Files* for all users), Start-menu entry, uninstaller |
-| Ubuntu / Debian (x86-64) | `ColorHide-vX.Y.Z-linux-x64.deb` | `/opt/ColorHide`, app-menu entry, `colorhide` command |
+| macOS (Apple silicon) | `Inkhue-vX.Y.Z-macos-arm64.pkg` | `/Applications` |
+| macOS (Intel) | `Inkhue-vX.Y.Z-macos-x64.pkg` | `/Applications` |
+| Windows 10/11 (64-bit) | `Inkhue-vX.Y.Z-windows-x64-setup.exe` | your user's programs folder (or *Program Files* for all users), Start-menu entry, uninstaller |
+| Ubuntu / Debian (x86-64) | `Inkhue-vX.Y.Z-linux-x64.deb` | `/opt/Inkhue`, app-menu entry, `inkhue` command |
 
-Get them from the [latest release](https://github.com/TonyD365/ColorHide/releases/latest). Every file has a
+Get them from the [latest release](https://github.com/TonyD365/Inkhue/releases/latest). Every file has a
 SHA-256 in `SHA256SUMS.txt` and a [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)
-(`gh attestation verify <file> -R TonyD365/ColorHide`).
+(`gh attestation verify <file> -R TonyD365/Inkhue`).
 
 <details>
 <summary><b>Installing: the installers are not code-signed by a paid certificate</b></summary>
 
 **macOS** — open the `.pkg`. The first time, macOS refuses it: open **System Settings → Privacy & Security**,
-scroll down, click **Open Anyway**, then follow the installer. ColorHide lands in **Applications**. You only do this
+scroll down, click **Open Anyway**, then follow the installer. Inkhue lands in **Applications**. You only do this
 once; updates install by themselves, without a password.
 
 **Windows** — run the `setup.exe`. If SmartScreen appears, click **More info → Run anyway**. No administrator rights
 needed unless you choose to install for all users.
 
-**Ubuntu / Debian** — `sudo apt install ./ColorHide-*.deb` (or double-click it). Then start *ColorHide* from the app
-menu or run `colorhide`. Scanning uses SANE (`sudo apt install sane-utils`); updates ask for your password.
+**Ubuntu / Debian** — `sudo apt install ./Inkhue-*.deb` (or double-click it). Then start *Inkhue* from the app
+menu or run `inkhue`. Scanning uses SANE (`sudo apt install sane-utils`); updates ask for your password.
 </details>
 
 ## How it works
@@ -122,17 +132,17 @@ PRs welcome.
 ## Build from source
 
 ```bash
-git clone https://github.com/TonyD365/ColorHide && cd ColorHide
+git clone https://github.com/TonyD365/Inkhue && cd Inkhue
 python3 -m venv .venv && .venv/bin/pip install -r requirements-app.txt
-.venv/bin/python -m colorhide            # the app
+.venv/bin/python -m inkhue            # the app
 ```
 
 Command line:
 
 ```bash
-python -m colorhide.cli encode photo.jpg page.png --width-in 6      # hide
-python -m colorhide.cli simulate page.png scan.png                  # software print + scan
-python -m colorhide.cli decode scan.png color.png                   # reveal
+python -m inkhue.cli encode photo.jpg page.png --width-in 6      # hide
+python -m inkhue.cli simulate page.png scan.png                  # software print + scan
+python -m inkhue.cli decode scan.png color.png                   # reveal
 ```
 
 Train the refiner (uses Apple GPU / CUDA if available):
@@ -141,16 +151,16 @@ Train the refiner (uses Apple GPU / CUDA if available):
 pip install -r requirements.txt
 python scripts/make_dataset.py data/div2k/DIV2K_valid_HR --crops 24 --size 128
 python scripts/train.py --steps 4000
-python -m colorhide.refiner_onnx models/refiner.pt models/refiner.onnx
+python -m inkhue.refiner_onnx models/refiner.pt models/refiner.onnx
 ```
 
-Package the app: `pyinstaller packaging/ColorHide.spec`. Releases are built by
+Package the app: `pyinstaller packaging/Inkhue.spec`. Releases are built by
 [GitHub Actions](.github/workflows/release.yml) whenever a release is published; the tag (`v1.2.3`) is the version.
 
 ## Format stability
 
 Pages printed today must still decode in ten years. The constants in
-[`colorhide/payload.py`](colorhide/payload.py) — above all `SEED` — are frozen and pinned by
+[`inkhue/payload.py`](inkhue/payload.py) — above all `SEED` — are frozen and pinned by
 [`tests/test_format.py`](tests/test_format.py). Any change to the on-paper format needs a new `VERSION` and a decoder
 that still reads the old one.
 
@@ -164,7 +174,7 @@ that still reads the old one.
 ## Contributing
 
 Issues and pull requests are welcome — especially **real-world print/scan results**
-([report template](https://github.com/TonyD365/ColorHide/issues/new?template=print-scan-report.yml)).
+([report template](https://github.com/TonyD365/Inkhue/issues/new?template=print-scan-report.yml)).
 See [CONTRIBUTING.md](CONTRIBUTING.md); security issues go through [SECURITY.md](SECURITY.md).
 
 ## License

@@ -71,9 +71,9 @@ jobs:
           cache-dependency-path: requirements-app.txt
       - run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
       - run: pip install -r requirements-app.txt pyinstaller
-      - run: pyinstaller packaging/ColorHide.spec --noconfirm
+      - run: pyinstaller packaging/Inkhue.spec --noconfirm
       - name: Packaged app decodes a page
-        run: dist/ColorHide/ColorHide --self-test && du -sh dist/ColorHide
+        run: dist/Inkhue/Inkhue --self-test && du -sh dist/Inkhue
 
   benchmark:
     name: Benchmark
@@ -117,7 +117,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
-                 --jq '[.[] | select(.body | startswith("<!-- colorhide-benchmark -->"))][0].id // empty')
+                 --jq '[.[] | select(.body | startswith("<!-- inkhue-benchmark -->"))][0].id // empty')
           if [ -n "$id" ]; then
             gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@compare.md > /dev/null
           else
@@ -147,7 +147,7 @@ jobs:
           hit=false
           if [ "${{ github.event_name }}" = pull_request ]; then
             gh pr diff ${{ github.event.pull_request.number }} --repo "$GITHUB_REPOSITORY" --name-only \
-              | grep -qE '^(packaging/|\.github/workflows/release\.yml|colorhide/updater\.py|requirements-app\.txt)' \
+              | grep -qE '^(packaging/|\.github/workflows/release\.yml|inkhue/updater\.py|requirements-app\.txt)' \
               && hit=true
           fi
           echo "packaging=$hit" | tee -a "$GITHUB_OUTPUT"

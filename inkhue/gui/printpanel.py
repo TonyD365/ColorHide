@@ -1,4 +1,4 @@
-"""ColorHide's print panel: live sheet preview on the left, settings on the right (destination, copies,
+"""Inkhue's print panel: live sheet preview on the left, settings on the right (destination, copies,
 layout, color, paper, pages per sheet, margins, scale, two-sided, headers and footers, the driver's
 own options). Jobs go straight to the print system (see printing.py), or into a PDF."""
 import sys
@@ -109,9 +109,10 @@ class Preview(QWidget):
 
 
 class PrintPanel(QDialog):
-    def __init__(self, parent, page, dpi, on_sent, title="ColorHide page"):
+    def __init__(self, parent, page, dpi, on_sent, title="Inkhue page", paper=None):
         super().__init__(parent)
         self.page, self.dpi, self.on_sent = page, dpi, on_sent
+        self.wanted_paper = paper  # the paper the page was sized for, preselected when the printer has it
         self.backend = printing.backend()
         self.caps = printing.pdf_capabilities()
         self.driver, self.problem = {}, None
@@ -308,7 +309,7 @@ class PrintPanel(QDialog):
 
     def apply_caps(self, caps, problem):
         self.caps, self.problem = caps, problem
-        keep = self.paper.currentData()
+        keep = self.paper.currentData() or self.wanted_paper
         self.paper.blockSignals(True)
         self.paper.clear()
         for value, label in caps.papers:
@@ -376,7 +377,7 @@ class PrintPanel(QDialog):
         s = self.settings()
         pid = self.dest.currentData()
         if pid == printing.PDF:
-            path, _ = QFileDialog.getSaveFileName(self, "Save as PDF", "ColorHide page.pdf", "PDF (*.pdf)")
+            path, _ = QFileDialog.getSaveFileName(self, "Save as PDF", "Inkhue page.pdf", "PDF (*.pdf)")
             if not path:
                 return
             try:

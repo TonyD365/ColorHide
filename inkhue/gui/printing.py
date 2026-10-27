@@ -131,9 +131,9 @@ class CupsBackend:
     def submit(self, printer, page, dpi, s: SheetSettings, driver, header=None):
         """driver: -o values for the driver's own options, incl. its color/duplex keys (see describe())."""
         ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
-        pdf = Path(tempfile.mkdtemp(prefix="colorhide-print-")) / "ColorHide page.pdf"
+        pdf = Path(tempfile.mkdtemp(prefix="inkhue-print-")) / "Inkhue page.pdf"
         sheet.write_pdf(pdf, media.mono(page), dpi, ps, s, header)
-        args = ["lp", "-d", printer, "-n", str(s.copies), "-t", "ColorHide page",
+        args = ["lp", "-d", printer, "-n", str(s.copies), "-t", "Inkhue page",
                 "-o", "print-scaling=none", "-o", "fit-to-page=false", "-o", f"PageSize={s.paper}",
                 "-o", f"print-color-mode={'color' if s.color else 'monochrome'}",
                 "-o", f"sides={'two-sided-long-edge' if s.duplex else 'one-sided'}"]
@@ -183,7 +183,7 @@ class QtBackend:
         img = media.mono(page)
         pl = sheet.place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s)
         pr = QPrinter(info, QPrinter.HighResolution)
-        pr.setDocName("ColorHide page")
+        pr.setDocName("Inkhue page")
         pr.setFullPage(True)
         pr.setPageLayout(sheet.page_layout(ps, pl))
         if "Resolution" in driver:
@@ -259,7 +259,7 @@ def system_dialog(parent, page, dpi, s: SheetSettings, header=None):
     page_in = QSizeF(img.width() / dpi, img.height() / dpi)
     ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
     pr = QPrinter(QPrinter.HighResolution)
-    pr.setDocName("ColorHide page")
+    pr.setDocName("Inkhue page")
     pr.setFullPage(True)
     pr.setPageLayout(sheet.page_layout(ps, sheet.place(page_in, ps, s)))
     pr.setCopyCount(s.copies)
@@ -279,7 +279,7 @@ def open_pdf(page, dpi, s: SheetSettings, header=None):
     """Write the sheet as a PDF and open it in the system viewer (Preview on macOS)."""
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QDesktopServices
-    path = Path(tempfile.mkdtemp(prefix="colorhide-print-")) / "ColorHide page.pdf"
+    path = Path(tempfile.mkdtemp(prefix="inkhue-print-")) / "Inkhue page.pdf"
     sheet.write_pdf(path, media.mono(page), dpi, page_size_for(s.paper) or QPageSize(QPageSize.Letter), s, header)
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
     return path

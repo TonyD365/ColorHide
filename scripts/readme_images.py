@@ -14,7 +14,7 @@ import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 from skimage import data  # noqa: E402
 
-from colorhide import api, channel  # noqa: E402
+from inkhue import api, channel  # noqa: E402
 
 ASSETS = ROOT / "assets"
 
@@ -65,7 +65,7 @@ def screenshot():
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
 
-    from colorhide.gui.main import Printer
+    from inkhue.gui.main import Printer
     app = QApplication([])
     w = Printer()
     w.resize(1000, 880)
@@ -86,7 +86,55 @@ def screenshot():
     app.exec()
 
 
+
+
+def reveal_gif(width=540, frames=16):
+    """assets/reveal.gif: the black-and-white print, wiped into the recovered color, and back."""
+    rgb = data.coffee()
+    page, _ = api.encode(rgb, width_in=5.0, dpi=600)
+    out, info = api.decode(channel.print_scan(page, seed=5), api.load_refiner())
+    assert info["rs_ok"]
+    ys, xs = np.where(page < 128)
+    bw = page[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    h = round(out.shape[0] * width / out.shape[1])
+    color = cv2.resize(out, (width, h), interpolation=cv2.INTER_AREA)
+    gray = cv2.cvtColor(cv2.resize(bw, (width, h), interpolation=cv2.INTER_AREA), cv2.COLOR_GRAY2RGB)
+    imgs = []
+    pos = [0] * 6 + [round(width * (i / frames) ** 1.5) for i in range(frames + 1)] + [width] * 10
+    for p in pos + pos[::-1][10:]:
+        f = gray.copy()
+        f[:, :p] = color[:, :p]
+        if 0 < p < width:
+            f[:, max(0, p - 2):p + 2] = (238, 107, 51)  # the scan line
+        imgs.append(Image.fromarray(f).quantize(colors=96, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE))
+    imgs[0].save(ASSETS / "reveal.gif", save_all=True, append_images=imgs[1:], duration=90, loop=0, optimize=True)
+
+
+def gallery(height=230):
+    """assets/gallery.png: more photos, plus one with handwriting on the printout."""
+    rows = []
+    for name, marks in (("astronaut", False), ("rocket", False), ("chelsea", True)):
+        rgb = getattr(data, name)()
+        page, _ = api.encode(rgb, width_in=4.0, dpi=600)
+        if marks:
+            page = channel.scribble(page, np.random.default_rng(4), inside=14, across=2)
+        out, info = api.decode(channel.print_scan(page, seed=3), api.load_refiner())
+        assert info["rs_ok"]
+        ys, xs = np.where(page < 128)
+        bw = cv2.cvtColor(page[ys.min():ys.max() + 1, xs.min():xs.max() + 1], cv2.COLOR_GRAY2RGB)
+        fit = lambda a: cv2.resize(a, (round(a.shape[1] * height / a.shape[0]), height), interpolation=cv2.INTER_AREA)
+        rows.append(np.hstack([fit(rgb), np.full((height, 16, 3), 24, np.uint8), fit(bw),
+                               np.full((height, 16, 3), 24, np.uint8), fit(out)]))
+    w = max(r.shape[1] for r in rows)
+    rows = [np.pad(r, ((0, 0), (0, w - r.shape[1]), (0, 0)), constant_values=24) for r in rows]
+    sheet = np.vstack([np.vstack([r, np.full((16, w, 3), 24, np.uint8)]) for r in rows])
+    Image.fromarray(np.pad(sheet, ((16, 0), (16, 16), (0, 0)), constant_values=24)).save(ASSETS / "gallery.png",
+                                                                                         optimize=True)
+
+
 if __name__ == "__main__":
     compare()
+    reveal_gif()
+    gallery()
     screenshot()
-    print("wrote assets/compare.png, assets/screenshot.png")
+    print("wrote assets/compare.png, reveal.gif, gallery.png, screenshot.png")

@@ -1,4 +1,4 @@
-"""ColorHide desktop app: a printer you feed color photos into and get hidden-color pages out of,
+"""Inkhue desktop app: a printer you feed color photos into and get hidden-color pages out of,
 and the reverse."""
 import sys
 from pathlib import Path
@@ -12,7 +12,18 @@ from PySide6.QtCore import (
     QThreadPool,
     QTimer,
 )
-from PySide6.QtGui import QColor, QFont, QIcon, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QIcon,
+    QImage,
+    QLinearGradient,
+    QPageSize,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -32,9 +43,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import api, updater
+from .. import api, halftone, layout, updater
 from .._version import __version__
-from . import media, scanner
+from . import media, scanner, sheet
 from .jobs import Job
 from .printpanel import PrintPanel
 from .viewer import Viewer
@@ -272,7 +283,7 @@ class Printer(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ColorHide")
+        self.setWindowTitle("Inkhue")
         self.pool = QThreadPool.globalInstance()
         self.mode = self.HIDE
         self.page = self.page_dpi = self.color = None
@@ -322,14 +333,14 @@ class Printer(QMainWindow):
     def _brand_and_settings(self):
         v = QVBoxLayout()
         v.setSpacing(6)
-        brand = QLabel(f'<span style="color:{ACCENT}">Color</span>Hide', objectName="brand")
+        brand = QLabel(f'Ink<span style="color:{ACCENT}">hue</span>', objectName="brand")
         v.addWidget(brand)
         v.addWidget(QLabel(f"LP-600  ·  HIDDEN-COLOR PRINTER  ·  v{__version__}", objectName="model"))
         v.addSpacing(10)
         g = QGridLayout()
         g.setHorizontalSpacing(12)
         g.setVerticalSpacing(8)
-        self.width_in = QDoubleSpinBox(suffix=" in", minimum=2, maximum=10, singleStep=0.5, value=6.0, decimals=1)
+        self.width_in = QDoubleSpinBox(suffix=" in", minimum=2, maximum=16, singleStep=0.5, value=6.0, decimals=2)
         self.dpi = QComboBox()
         self.dpi.addItems(["300", "600", "1200"])
         self.dpi.setCurrentText("600")
@@ -343,12 +354,30 @@ class Printer(QMainWindow):
         self.use_net.setToolTip("Clean up the decoded color with the trained network" if has_model
                                 else "No trained model found (models/refiner.onnx)")
         for r, (name, w) in enumerate([("PRINT WIDTH", self.width_in), ("PRINTER DPI", self.dpi),
-                                       ("PDF PAPER", self.paper), ("DECODER", self.use_net)]):
+                                       ("PAPER", self.paper), ("DECODER", self.use_net)]):
             g.addWidget(small_label(name), r, 0)
             g.addWidget(w, r, 1)
+        # what the width means: on paper, and how many pixels the color comes back with
+        self.fill = QCheckBox("Fill the paper")
+        self.fill.setChecked(True)
+        self.fill.setToolTip("Print as large as fits on the PDF paper at 100 % (bigger = sharper color)")
+        self.fill.toggled.connect(lambda on: self.width_in.setEnabled(not on))
+        self.width_in.setEnabled(False)
+        g.addWidget(self.fill, 4, 1)
+        self.width_info = QLabel()
+        self.width_info.setStyleSheet("color: #666; font-size: 10px;")
+        g.addWidget(self.width_info, 0, 2)
+        self.width_in.valueChanged.connect(self._width_info)
+        self.dpi.currentTextChanged.connect(self._width_info)
+        self._width_info()
         v.addLayout(g)
         v.addStretch(1)
         return v
+
+    def _width_info(self):
+        w = self.width_in.value()
+        cells = int(w * int(self.dpi.currentText()) / halftone.K) - 2 * (layout.B + layout.QUIET)
+        self.width_info.setText(f"{w * 2.54:.1f} cm · color back at ~{2 * cells} px")
 
     def _control_panel(self):
         panel = QFrame(objectName="panel")
@@ -476,14 +505,19 @@ class Printer(QMainWindow):
     def feed(self, path):
         self.source_name = Path(path).stem
         width, dpi = self.width_in.value(), int(self.dpi.currentText())
+        paper = media.PAPERS.get(self.paper.currentText())
+        fill = self.fill.isChecked() and paper is not None
 
         def work():
             rgb = media.read_image(path, gray=False)
-            page, info = api.encode(rgb, width, dpi)
-            return rgb, page, info
+            w = sheet.fill_width(rgb.shape[0] / rgb.shape[1], QPageSize(paper), dpi) if fill else width
+            page, info = api.encode(rgb, w, dpi)
+            return rgb, page, info, w
 
         def done(r):
-            rgb, page, info = r
+            rgb, page, info, w = r
+            if fill:
+                self.width_in.setValue(w)
             self.page, self.page_dpi, self.color = page, dpi, None
             self.tray_in.paper.set_image(media.rgb_to_qimage(rgb))
             self.tray_out.eject(media.gray_to_qimage(page), "HIDDEN-COLOR PAGE  ·  DOUBLE-CLICK TO SEE THE DOTS")
@@ -496,7 +530,9 @@ class Printer(QMainWindow):
         if self.page is None:
             return
         self.say("PRINT SETUP", "CHOOSE PRINTER + OPTIONS")
-        panel = PrintPanel(self, self.page, self.page_dpi, self.printed, title=f"ColorHide · {self.source_name}")
+        paper = {"US Letter": "Letter", "A4": "A4"}.get(self.paper.currentText())
+        panel = PrintPanel(self, self.page, self.page_dpi, self.printed, title=f"Inkhue · {self.source_name}",
+                           paper=paper)
         panel.rejected.connect(lambda: self.say("PAGE READY", "PRINT CANCELLED"))
         panel.open()
 
@@ -508,7 +544,7 @@ class Printer(QMainWindow):
     def export_pdf(self):
         if self.page is None:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Export PDF", f"{self.source_name}-colorhide.pdf", "PDF (*.pdf)")
+        path, _ = QFileDialog.getSaveFileName(self, "Export PDF", f"{self.source_name}-inkhue.pdf", "PDF (*.pdf)")
         if not path:
             return
         try:
@@ -593,11 +629,11 @@ class Printer(QMainWindow):
 
     def update_ready(self, info, new_app):
         self.pending_update = new_app
-        self.statusBar().showMessage(f"ColorHide {info['tag']} is ready; it installs when you quit.")
+        self.statusBar().showMessage(f"Inkhue {info['tag']} is ready; it installs when you quit.")
         box = QMessageBox(self)
         box.setWindowTitle("Update ready")
         extra = "\nYou'll be asked for your password to install it." if sys.platform.startswith("linux") else ""
-        box.setText(f"ColorHide {info['tag']} has been downloaded and verified.\n"
+        box.setText(f"Inkhue {info['tag']} has been downloaded and verified.\n"
                     f"You have v{__version__}.{extra}")
         box.setDetailedText(info["notes"] or "")
         now = box.addButton("Restart Now", QMessageBox.AcceptRole)
@@ -614,7 +650,7 @@ class Printer(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("ColorHide")
+    app.setApplicationName("Inkhue")
     app.setApplicationVersion(__version__)
     app.setWindowIcon(QIcon(str(api.ICON)))
     w = Printer()

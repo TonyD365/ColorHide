@@ -1,14 +1,14 @@
 codec:
-  - changed-files: [{ any-glob-to-any-file: ["colorhide/*.py", "!colorhide/updater.py"] }]
+  - changed-files: [{ any-glob-to-any-file: ["inkhue/*.py", "!inkhue/updater.py"] }]
 app:
-  - changed-files: [{ any-glob-to-any-file: ["colorhide/gui/**", "packaging/**", "assets/**"] }]
+  - changed-files: [{ any-glob-to-any-file: ["inkhue/gui/**", "packaging/**", "assets/**"] }]
 refiner:
-  - changed-files: [{ any-glob-to-any-file: ["colorhide/refiner*.py", "models/**", "scripts/train.py", "scripts/make_dataset.py"] }]
+  - changed-files: [{ any-glob-to-any-file: ["inkhue/refiner*.py", "models/**", "scripts/train.py", "scripts/make_dataset.py"] }]
 updater:
-  - changed-files: [{ any-glob-to-any-file: ["colorhide/updater.py"] }]
+  - changed-files: [{ any-glob-to-any-file: ["inkhue/updater.py"] }]
 ci:
   - changed-files: [{ any-glob-to-any-file: [".github/**"] }]
 documentation:
   - changed-files: [{ any-glob-to-any-file: ["*.md", "assets/*.png"] }]
 format-change:
-  - changed-files: [{ any-glob-to-any-file: ["colorhide/payload.py", "colorhide/halftone.py", "colorhide/layout.py", "tests/test_format.py"] }]
+  - changed-files: [{ any-glob-to-any-file: ["inkhue/payload.py", "inkhue/halftone.py", "inkhue/layout.py", "tests/test_format.py"] }]
