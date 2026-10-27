@@ -50,9 +50,10 @@ footer { padding:40px 0 60px; color:var(--muted); text-align:center; font-size:1
   <p class="tag">A black-and-white print that carries its own color.</p>
   <p class="sub">Print a color photo or document on any black-and-white printer — it looks like an ordinary grayscale page. Scan it, and Inkhue brings the color back. Free and open source.</p>
   <div class="btns">
-    <a class="btn primary" href="https://github.com/TonyD365/Inkhue/releases/latest">Download for macOS · Windows · Linux</a>
+    <a class="btn primary" id="dl" href="https://github.com/TonyD365/Inkhue/releases/latest">Download for macOS · Windows · Linux</a>
     <a class="btn ghost" href="https://github.com/TonyD365/Inkhue">View on GitHub</a>
   </div>
+  <p class="cap" id="dl-note"></p>
   <img class="reveal" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/reveal.gif" alt="A black-and-white printout being scanned back into color">
 </header>
 
@@ -113,6 +114,33 @@ footer { padding:40px 0 60px; color:var(--muted); text-align:center; font-size:1
   <a href="https://github.com/TonyD365/Inkhue/blob/main/README.zh-CN.md">中文</a>
 </footer>
 <script>
+// Download button: pick the installer for this visitor's system from the latest release.
+(async () => {
+  const btn = document.getElementById("dl"), note = document.getElementById("dl-note");
+  const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  let os = /Win/i.test(plat + ua) ? "windows" : /Mac/i.test(plat + ua) ? "macos" : /Linux|X11/i.test(plat + ua) && !/Android/i.test(ua) ? "linux" : null;
+  if (!os) return;  // phones, tablets, unknown: keep the general link
+  let arch = "x64";
+  if (os === "macos") {
+    try {  // Chrome/Edge tell the CPU architecture; Safari doesn't, and nearly every Mac sold since 2021 is Apple silicon
+      const h = navigator.userAgentData && await navigator.userAgentData.getHighEntropyValues(["architecture"]);
+      arch = h && h.architecture === "x86" ? "x64" : "arm64";
+    } catch (e) { arch = "arm64"; }
+  }
+  const key = `${os}-${arch}`;
+  const label = {"macos-arm64": "macOS (Apple silicon)", "macos-x64": "macOS (Intel)", "windows-x64": "Windows", "linux-x64": "Ubuntu / Debian"}[key];
+  try {
+    const rel = await (await fetch("https://api.github.com/repos/TonyD365/Inkhue/releases/latest")).json();
+    const ext = os === "macos" ? ".pkg" : os === "windows" ? "-setup.exe" : ".deb";
+    const asset = (rel.assets || []).find(a => a.name.includes(key) && a.name.endsWith(ext));
+    if (!asset) return;
+    btn.href = asset.browser_download_url;
+    btn.textContent = `Download for ${label} · ${rel.tag_name}`;
+    const other = os === "macos" ? (arch === "arm64" ? "Intel Mac" : "Apple silicon Mac") + ", " : "";
+    note.innerHTML = `${(asset.size / 1048576).toFixed(0)} MB · free. <a href="https://github.com/TonyD365/Inkhue/releases/latest">${other}Windows, Linux and other versions</a>`;
+  } catch (e) { /* keep the general link */ }
+})();
+
 // Roadmap, fetched live: open issues labelled "roadmap" are planned, closed-as-completed ones are done.
 (async () => {
   const box = document.getElementById("roadmap-items");
