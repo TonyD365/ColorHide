@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inkhue — a black-and-white print that carries its own color</title>
+<meta name="description" content="Print color photos and documents on any black-and-white printer. Scan them, and Inkhue brings the color back. Free and open source.">
+<meta property="og:title" content="Inkhue">
+<meta property="og:description" content="A black-and-white print that carries its own color.">
+<meta property="og:image" content="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/social-preview.png">
+<link rel="icon" href="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/icon.png">
+<style>
+:root { --bg:#f6f4ef; --fg:#1d1d20; --muted:#5f6068; --card:#ffffff; --line:#e3e0d8; --accent:#ee6b33; --accent2:#c4511f; }
+@media (prefers-color-scheme: dark) { :root { --bg:#16171a; --fg:#ecebe7; --muted:#a3a4ab; --card:#202227; --line:#2f3138; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+a { color:var(--accent); }
+.wrap { max-width:1060px; margin:0 auto; padding:0 20px; }
+header.hero { text-align:center; padding:64px 0 32px; }
+.logo { width:104px; height:104px; }
+h1 { font-size:clamp(40px,7vw,68px); margin:12px 0 4px; letter-spacing:-1px; }
+h1 span { color:var(--accent); }
+.tag { font-size:clamp(20px,3vw,26px); font-weight:600; margin:0 0 10px; }
+.sub { color:var(--muted); max-width:640px; margin:0 auto 26px; }
+.btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+.btn { display:inline-block; padding:12px 22px; border-radius:999px; font-weight:700; text-decoration:none; }
+.btn.primary { background:var(--accent); color:#fff; } .btn.primary:hover { background:var(--accent2); }
+.btn.ghost { border:1.5px solid var(--line); color:var(--fg); }
+.reveal { display:block; margin:40px auto 0; width:min(560px,100%); border-radius:14px; box-shadow:0 18px 50px rgba(0,0,0,.25); }
+section { padding:56px 0; border-top:1px solid var(--line); }
+h2 { font-size:30px; margin:0 0 18px; }
+.grid { display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); }
+.card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
+.card h3 { margin:0 0 6px; font-size:18px; }
+.card p { margin:0; color:var(--muted); font-size:15px; }
+.done { color:#2e9e5b; font-weight:700; font-size:13px; } .planned { color:var(--accent); font-weight:700; font-size:13px; }
+.num { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff; font-weight:800; margin-bottom:8px; }
+img.wide { width:100%; border-radius:12px; display:block; }
+.cap { color:var(--muted); font-size:14px; margin-top:8px; text-align:center; }
+table { width:100%; border-collapse:collapse; font-size:15px; }
+td, th { padding:10px 8px; border-bottom:1px solid var(--line); text-align:left; }
+th { color:var(--muted); font-weight:600; }
+footer { padding:40px 0 60px; color:var(--muted); text-align:center; font-size:14px; border-top:1px solid var(--line); }
+</style>
+</head>
+<body>
+<header class="hero wrap">
+  <img class="logo" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/icon.png" alt="Inkhue icon">
+  <h1>Ink<span>hue</span></h1>
+  <p class="tag">A black-and-white print that carries its own color.</p>
+  <p class="sub">Print a color photo or document on any black-and-white printer — it looks like an ordinary grayscale page. Scan it, and Inkhue brings the color back. Free and open source.</p>
+  <div class="btns">
+    <a class="btn primary" id="dl" href="https://github.com/TonyD365/Inkhue/releases/latest">Download for macOS · Windows · Linux</a>
+    <a class="btn ghost" href="https://github.com/TonyD365/Inkhue">View on GitHub</a>
+  </div>
+  <p class="cap" id="dl-note"></p>
+  <img class="reveal" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/reveal.gif" alt="A black-and-white printout being scanned back into color">
+</header>
+
+<section class="wrap">
+  <h2>See it</h2>
+  <img class="wide" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/compare.png" alt="Original, black-and-white print, recovered color">
+  <p class="cap">Original · what gets printed (inset: the actual printer dots) · color recovered from the scan, at 2× resolution.</p>
+  <img class="wide" style="margin-top:28px" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/gallery.png" alt="Three more examples, one written on with a pen">
+  <p class="cap">Bottom row: written on with a pen — the color still comes back, and the handwriting stays.</p>
+  <img class="wide" style="margin-top:28px" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/document.png" alt="A page of notes recovered in color">
+  <p class="cap">Documents too: highlights, colored text and charts.</p>
+</section>
+
+<section class="wrap">
+  <h2>How to use</h2>
+  <div class="grid">
+    <div class="card"><div class="num">1</div><h3>Install</h3><p>macOS, Windows or Ubuntu/Debian installer. Updates itself.</p></div>
+    <div class="card"><div class="num">2</div><h3>Hide color</h3><p>Load a photo, image or PDF. Inkhue makes the black-and-white page, as large as your paper allows.</p></div>
+    <div class="card"><div class="num">3</div><h3>Print</h3><p>From Inkhue's print panel at 100 % scale, on any black-and-white printer.</p></div>
+    <div class="card"><div class="num">4</div><h3>Reveal color</h3><p>Scan in grayscale at 600 dpi (400 at least). The color comes back — export it as PNG, JPEG or PDF.</p></div>
+  </div>
+  <img class="wide" style="margin-top:28px; max-width:760px; margin-left:auto; margin-right:auto" src="https://raw.githubusercontent.com/TonyD365/Inkhue/main/assets/screenshot.png" alt="The Inkhue app">
+</section>
+
+<section class="wrap">
+  <h2>How it works</h2>
+  <div class="grid">
+    <div class="card"><h3>Dots carry data</h3><p>Every pixel is a 4×4 cell of printer dots. How many dots are inked sets the gray; which corner the ink leans towards stores 2 bits — about 5.6 KB per square inch.</p></div>
+    <div class="card"><h3>Built to survive</h3><p>Color at 1/8 resolution, Reed-Solomon error correction, repeated across the page and scattered. Smudges, handwriting, tilt and upside-down scans are fine.</p></div>
+    <div class="card"><h3>Neural refiner</h3><p>A small network reads the scan dot by dot and returns the photo at 2× resolution, without grain.</p></div>
+    <div class="card"><h3>Open by design</h3><p>No key, no encryption, no account. Hidden from the eye, not from people. Apache-2.0.</p></div>
+  </div>
+  <p style="margin-top:22px">The full story, step by step, is in the <a href="https://github.com/TonyD365/Inkhue#how-it-works">README</a> and the <a href="https://github.com/TonyD365/Inkhue/wiki">wiki</a>.</p>
+</section>
+
+<section class="wrap" id="roadmap">
+  <h2>Roadmap</h2>
+  <div class="grid" id="roadmap-items"><p class="cap" style="text-align:left">Loading…</p></div>
+  <p class="cap" style="text-align:left">Live from GitHub: issues labelled <code>roadmap</code>.</p>
+</section>
+
+<section class="wrap">
+  <h2>Tested</h2>
+  <table>
+    <tr><th>Condition (simulated print + scan)</th><th>Decoded</th><th>Color error ΔE</th></tr>
+    <tr><td>Typical print and scan</td><td>100 %</td><td>2.5</td></tr>
+    <tr><td>Scan at 400 dpi</td><td>100 %</td><td>3.3</td></tr>
+    <tr><td>Handwriting on the page</td><td>100 %</td><td>3.3</td></tr>
+    <tr><td>Poor print and poor scan</td><td>80 %</td><td>6.7</td></tr>
+  </table>
+  <p class="cap">ΔE ≈ 2 is barely visible. Tried it on a real printer? <a href="https://github.com/TonyD365/Inkhue/issues/new?template=print-scan-report.yml">Share your result</a>.</p>
+</section>
+
+<footer class="wrap">
+  Inkhue is free and open source (Apache-2.0) ·
+  <a href="https://github.com/TonyD365/Inkhue">GitHub</a> ·
+  <a href="https://github.com/TonyD365/Inkhue/discussions">Discussions</a> ·
+  <a href="https://github.com/TonyD365/Inkhue/blob/main/README.zh-CN.md">中文</a>
+</footer>
+<script>
+// Download button: pick the installer for this visitor's system from the latest release.
+(async () => {
+  const btn = document.getElementById("dl"), note = document.getElementById("dl-note");
+  const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  let os = /Win/i.test(plat + ua) ? "windows" : /Mac/i.test(plat + ua) ? "macos" : /Linux|X11/i.test(plat + ua) && !/Android/i.test(ua) ? "linux" : null;
+  if (!os) return;  // phones, tablets, unknown: keep the general link
+  let arch = "x64";
+  if (os === "macos") {
+    try {  // Chrome/Edge tell the CPU architecture; Safari doesn't, and nearly every Mac sold since 2021 is Apple silicon
+      const h = navigator.userAgentData && await navigator.userAgentData.getHighEntropyValues(["architecture"]);
+      arch = h && h.architecture === "x86" ? "x64" : "arm64";
+    } catch (e) { arch = "arm64"; }
+  }
+  const key = `${os}-${arch}`;
+  const label = {"macos-arm64": "macOS (Apple silicon)", "macos-x64": "macOS (Intel)", "windows-x64": "Windows", "linux-x64": "Ubuntu / Debian"}[key];
+  try {
+    const rel = await (await fetch("https://api.github.com/repos/TonyD365/Inkhue/releases/latest")).json();
+    const ext = os === "macos" ? ".pkg" : os === "windows" ? "-setup.exe" : ".deb";
+    const asset = (rel.assets || []).find(a => a.name.includes(key) && a.name.endsWith(ext));
+    if (!asset) return;
+    btn.href = asset.browser_download_url;
+    btn.textContent = `Download for ${label} · ${rel.tag_name}`;
+    const other = os === "macos" ? (arch === "arm64" ? "Intel Mac" : "Apple silicon Mac") + ", " : "";
+    note.innerHTML = `${(asset.size / 1048576).toFixed(0)} MB · free. <a href="https://github.com/TonyD365/Inkhue/releases/latest">${other}Windows, Linux and other versions</a>`;
+  } catch (e) { /* keep the general link */ }
+})();
+
+// Roadmap, fetched live: open issues labelled "roadmap" are planned, closed-as-completed ones are done.
+(async () => {
+  const box = document.getElementById("roadmap-items");
+  const esc = t => t.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  try {
+    const r = await fetch("https://api.github.com/repos/TonyD365/Inkhue/issues?labels=roadmap&state=all&per_page=50");
+    if (!r.ok) throw new Error(r.status);
+    const items = (await r.json()).filter(i => !i.pull_request && !(i.state === "closed" && i.state_reason !== "completed"));
+    if (!items.length) { box.innerHTML = '<p class="cap" style="text-align:left">The roadmap will be published soon.</p>'; return; }
+    items.sort((a, b) => (a.state === b.state ? 0 : a.state === "open" ? -1 : 1));
+    box.innerHTML = items.map(i => `<a class="card" href="${i.html_url}" style="text-decoration:none;color:inherit">
+      <span class="${i.state === "open" ? "planned" : "done"}">${i.state === "open" ? "PLANNED" : "✓ DONE"}</span>
+      <h3>${esc(i.title)}</h3></a>`).join("");
+  } catch (e) {
+    box.innerHTML = '<p class="cap" style="text-align:left">See the <a href="https://github.com/TonyD365/Inkhue/issues?q=label%3Aroadmap">roadmap on GitHub</a>.</p>';
+  }
+})();
+</script>
+</body>
+</html>
