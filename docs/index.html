@@ -33,6 +33,7 @@ h2 { font-size:30px; margin:0 0 18px; }
 .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; }
 .card h3 { margin:0 0 6px; font-size:18px; }
 .card p { margin:0; color:var(--muted); font-size:15px; }
+.done { color:#2e9e5b; font-weight:700; font-size:13px; } .planned { color:var(--accent); font-weight:700; font-size:13px; }
 .num { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff; font-weight:800; margin-bottom:8px; }
 img.wide { width:100%; border-radius:12px; display:block; }
 .cap { color:var(--muted); font-size:14px; margin-top:8px; text-align:center; }
@@ -87,6 +88,12 @@ footer { padding:40px 0 60px; color:var(--muted); text-align:center; font-size:1
   <p style="margin-top:22px">The full story, step by step, is in the <a href="https://github.com/TonyD365/Inkhue#how-it-works">README</a> and the <a href="https://github.com/TonyD365/Inkhue/wiki">wiki</a>.</p>
 </section>
 
+<section class="wrap" id="roadmap">
+  <h2>Roadmap</h2>
+  <div class="grid" id="roadmap-items"><p class="cap" style="text-align:left">Loading…</p></div>
+  <p class="cap" style="text-align:left">Live from GitHub: issues labelled <code>roadmap</code>.</p>
+</section>
+
 <section class="wrap">
   <h2>Tested</h2>
   <table>
@@ -105,5 +112,24 @@ footer { padding:40px 0 60px; color:var(--muted); text-align:center; font-size:1
   <a href="https://github.com/TonyD365/Inkhue/discussions">Discussions</a> ·
   <a href="https://github.com/TonyD365/Inkhue/blob/main/README.zh-CN.md">中文</a>
 </footer>
+<script>
+// Roadmap, fetched live: open issues labelled "roadmap" are planned, closed-as-completed ones are done.
+(async () => {
+  const box = document.getElementById("roadmap-items");
+  const esc = t => t.replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  try {
+    const r = await fetch("https://api.github.com/repos/TonyD365/Inkhue/issues?labels=roadmap&state=all&per_page=50");
+    if (!r.ok) throw new Error(r.status);
+    const items = (await r.json()).filter(i => !i.pull_request && !(i.state === "closed" && i.state_reason !== "completed"));
+    if (!items.length) { box.innerHTML = '<p class="cap" style="text-align:left">The roadmap will be published soon.</p>'; return; }
+    items.sort((a, b) => (a.state === b.state ? 0 : a.state === "open" ? -1 : 1));
+    box.innerHTML = items.map(i => `<a class="card" href="${i.html_url}" style="text-decoration:none;color:inherit">
+      <span class="${i.state === "open" ? "planned" : "done"}">${i.state === "open" ? "PLANNED" : "✓ DONE"}</span>
+      <h3>${esc(i.title)}</h3></a>`).join("");
+  } catch (e) {
+    box.innerHTML = '<p class="cap" style="text-align:left">See the <a href="https://github.com/TonyD365/Inkhue/issues?q=label%3Aroadmap">roadmap on GitHub</a>.</p>';
+  }
+})();
+</script>
 </body>
 </html>
