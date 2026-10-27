@@ -25,8 +25,16 @@ class Job(QRunnable):
     def run(self):
         try:
             kw = {"progress": self.sig.progress.emit} if self.want_progress else {}
-            self.sig.done.emit(self.fn(*self.args, **kw))
+            result = self.fn(*self.args, **kw)
         except Exception as ex:
             if not self.quiet:
                 traceback.print_exc()
-            self.sig.failed.emit(str(ex) or type(ex).__name__)
+            self._emit(self.sig.failed, str(ex) or type(ex).__name__)
+            return
+        self._emit(self.sig.done, result)
+
+    def _emit(self, signal, value):
+        try:
+            signal.emit(value)
+        except RuntimeError:  # whoever asked (a closed dialog, a finished app) is gone: drop the result
+            Job.live.discard(self)

@@ -51,8 +51,17 @@ def test_app_cycle(tmp_path):
         media.save_color(w.color, tmp_path / f"out.{ext}")
         assert (tmp_path / f"out.{ext}").stat().st_size > 1000
 
+    from colorhide.gui.viewer import Viewer
+    v = Viewer(w, media.gray_to_qimage(w.page), "page")  # full-resolution zoom view
+    v.show()
+    v.view.zoom(4.0)
+    app.processEvents()
+    v.close()
+
     panel = PrintPanel(w, w.page, w.page_dpi, lambda *_: None)  # lists printers; CI machines may have none
     panel.show()
     app.processEvents()
     panel.close()
     w.close()
+    from PySide6.QtCore import QThreadPool
+    QThreadPool.globalInstance().waitForDone(30000)  # let background jobs (printer queries) finish

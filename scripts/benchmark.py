@@ -3,8 +3,10 @@
   python scripts/benchmark.py --out bench.json                 # run
   python scripts/benchmark.py --compare base.json bench.json   # markdown diff (for PR comments)
 
-Metrics per condition: decode success rate, raw channel bit error rate, colour error (CIEDE2000,
-lower is better) and PSNR for the classic and neural decoders, plus encode/decode time.
+Metrics per condition: decode success rate, raw channel bit error rate, colour error (CIEDE2000 at
+cell resolution, lower is better) for the classic and neural decoders, detail (PSNR against the photo
+at 2x cell resolution; 1x outputs are upscaled first), and decode time. Per run: print sharpness, the
+SSIM between the printed page as the eye sees it and the photo.
 """
 import argparse
 import json
@@ -19,8 +21,9 @@ import cv2
 import numpy as np
 from skimage import color as skcolor
 from skimage import data as skdata
+from skimage.metrics import structural_similarity
 
-from colorhide import api, channel, codec, payload
+from colorhide import api, channel, codec, halftone, layout, payload
 
 # scikit-image sample photos: public domain / CC0
 IMAGES = ["astronaut", "coffee", "chelsea", "rocket"]
@@ -42,6 +45,20 @@ def psnr(a, b):
     return float(10 * np.log10(255.0 ** 2 / np.mean((a.astype(float) - b.astype(float)) ** 2)))
 
 
+def print_sharpness(page, rgb, cw, ch):
+    """The page as the eye sees it at reading distance (Gaussian, sigma 1.5 dots at 600 dpi) vs the photo."""
+    k, off = halftone.K, (layout.QUIET + layout.B) * halftone.K
+    ink = (page < 128).astype(float)[off:off + ch * k, off:off + cw * k]
+    seen = 1 - cv2.GaussianBlur(ink, (0, 0), 1.5)
+    hi = cv2.resize(rgb, (cw * k, ch * k), interpolation=cv2.INTER_CUBIC) / 255.0
+    return float(structural_similarity(seen, np.clip(codec.rgb_to_ycbcr(hi)[..., 0], 0, 1), data_range=1))
+
+
+def _at(img, w, h):
+    interp = cv2.INTER_AREA if img.shape[1] > w else cv2.INTER_CUBIC
+    return np.clip(cv2.resize(img, (w, h), interpolation=interp), 0, 255)
+
+
 def run():
     refiner = api.load_refiner()
     rows = []
@@ -52,6 +69,8 @@ def run():
         t_enc = time.perf_counter() - t
         cw, ch = info["cells"]
         ref = cv2.resize(rgb, (cw, ch), interpolation=cv2.INTER_AREA)
+        ref2 = cv2.resize(rgb, (2 * cw, 2 * ch), interpolation=cv2.INTER_AREA)
+        sharp = print_sharpness(page, rgb, cw, ch)
         ycc = codec.rgb_to_ycbcr(ref / 255.0)
         sh = payload.chroma_shape(ch, cw, 8)
         small = cv2.resize(ycc[..., 1:], (sh[1], sh[0]), interpolation=cv2.INTER_AREA)
@@ -59,7 +78,7 @@ def run():
         for cond, params in CONDITIONS.items():
             for seed in SEEDS:
                 scan = channel.print_scan(page, seed=seed, **params)
-                row = dict(image=name, condition=cond, seed=seed, encode_s=t_enc, ok=False)
+                row = dict(image=name, condition=cond, seed=seed, encode_s=t_enc, ok=False, print_ssim=sharp)
                 try:
                     _, soft, h, w = codec.demodulate(scan)
                     if (h, w) == (ch, cw):
@@ -68,10 +87,13 @@ def run():
                     out, dinfo = api.decode(scan, None)
                     row["decode_s"] = time.perf_counter() - t
                     row["ok"] = bool(dinfo["rs_ok"])
-                    row["de_classic"], row["psnr_classic"] = delta_e(ref, out), psnr(ref, out)
+                    row["de_classic"] = delta_e(ref, _at(out, cw, ch))
+                    row["psnr2x_classic"] = psnr(ref2, _at(out, 2 * cw, 2 * ch))
                     if refiner is not None:
                         out_n, _ = api.decode(scan, refiner)
-                        row["de_neural"], row["psnr_neural"] = delta_e(ref, out_n), psnr(ref, out_n)
+                        row["scale_neural"] = out_n.shape[1] / cw
+                        row["de_neural"] = delta_e(ref, _at(out_n, cw, ch))
+                        row["psnr2x_neural"] = psnr(ref2, _at(out_n, 2 * cw, 2 * ch))
                 except Exception as ex:  # a failed decode is a result, not a crash
                     row["error"] = str(ex)
                 rows.append(row)
@@ -91,20 +113,45 @@ def summarize(result):
             return float(np.mean(vals)) if vals else None
         out[cond] = dict(success=sum(r["ok"] for r in rs) / len(rs), ber=mean("ber"),
                          de_classic=mean("de_classic"), de_neural=mean("de_neural"),
-                         psnr_classic=mean("psnr_classic"), psnr_neural=mean("psnr_neural"),
+                         psnr2x_classic=mean("psnr2x_classic"), psnr2x_neural=mean("psnr2x_neural"),
                          decode_s=mean("decode_s"))
     out["_encode_s"] = float(np.mean([r["encode_s"] for r in result["rows"]]))
+    sharp = [r["print_ssim"] for r in result["rows"] if "print_ssim" in r]
+    out["_print_ssim"] = float(np.mean(sharp)) if sharp else None
+    scales = [r["scale_neural"] for r in result["rows"] if "scale_neural" in r]
+    out["_scale"] = round(float(np.mean(scales))) if scales else None
     return out
 
 
 def fmt(v, kind):
     if v is None:
         return "—"
-    return {"pct": f"{v:.0%}", "ber": f"{v:.2%}", "de": f"{v:.2f}", "db": f"{v:.1f}", "s": f"{v:.2f}s"}[kind]
+    return {"pct": f"{v:.0%}", "ber": f"{v:.2%}", "de": f"{v:.2f}", "db": f"{v:.1f}", "s": f"{v:.2f}s",
+            "ssim": f"{v:.3f}"}[kind]
 
 
 COLS = [("success", "Decoded", "pct", +1), ("ber", "Raw BER", "ber", -1), ("de_classic", "ΔE classic", "de", -1),
-        ("de_neural", "ΔE neural", "de", -1), ("psnr_neural", "PSNR neural", "db", +1), ("decode_s", "Decode", "s", -1)]
+        ("de_neural", "ΔE neural", "de", -1), ("psnr2x_neural", "Detail (PSNR @2×)", "db", +1),
+        ("decode_s", "Decode", "s", -1)]
+
+
+def headline(summary, base=None):
+    def one(key, label, kind, better):
+        v = summary.get(key)
+        if v is None:
+            return f"{label}: —"
+        txt = f"{label}: **{fmt(v, kind)}**"
+        b = base.get(key) if base else None
+        if b is not None and abs(v - b) / abs(b) >= 0.02:
+            txt += f" {'🟢' if (v - b) * better > 0 else '🔴'} (was {fmt(b, kind)})"
+        return txt
+
+    scale = summary.get("_scale")
+    out = one("_print_ssim", "Print sharpness (SSIM, eye model)", "ssim", +1)
+    out += f" · Neural output: **{scale}× cell resolution**" if scale else ""
+    if base and base.get("_scale") and scale != base.get("_scale"):
+        out += f" (was {base['_scale']}×)"
+    return out
 
 
 def table(summary, base=None):
@@ -130,8 +177,9 @@ def compare(base_path, head_path):
     regressions = [c for c in CONDITIONS if head[c]["success"] < base[c]["success"]]
     md = ["<!-- colorhide-benchmark -->", "## 📊 Codec benchmark", "",
           f"{len(IMAGES)} public-domain photos × {len(SEEDS)} seeds per condition, simulated print + scan. "
-          "ΔE is CIEDE2000 colour error (lower is better). 🟢/🔴 = better/worse than the base branch.", "",
-          table(head, base), ""]
+          "ΔE is CIEDE2000 colour error at cell resolution (lower is better); Detail compares with the photo at 2× "
+          "cell resolution. 🟢/🔴 = better/worse than the base branch.", "",
+          headline(head, base), "", table(head, base), ""]
     if regressions:
         md.append(f"> [!WARNING]\n> Decode success dropped under: **{', '.join(regressions)}**")
     else:
@@ -154,7 +202,8 @@ def main():
         sys.exit(1 if regressed and args.fail_on_regression else 0)
     result = run()
     Path(args.out).write_text(json.dumps(result, indent=1))
-    md = "## 📊 Codec benchmark\n\n" + table(summarize(result))
+    summary = summarize(result)
+    md = "## 📊 Codec benchmark\n\n" + headline(summary) + "\n\n" + table(summary)
     print("\n" + md)
     if args.markdown:
         Path(args.markdown).write_text(md + "\n")
