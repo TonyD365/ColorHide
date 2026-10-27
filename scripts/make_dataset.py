@@ -13,7 +13,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from colorhide import channel, codec, halftone, payload
+from inkhue import channel, codec, halftone, payload
 
 FACTOR, QBITS, K = 8, 6, halftone.K
 ARGS = None

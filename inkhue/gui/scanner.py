@@ -65,7 +65,7 @@ def _scan_macos(on_done, on_error):
         IKScannerDeviceViewTransferModeFileBased,
     )
 
-    out_dir = Path(tempfile.mkdtemp(prefix="colorhide-scan-"))
+    out_dir = Path(tempfile.mkdtemp(prefix="inkhue-scan-"))
 
     class Delegate(NSObject):
         def deviceBrowserView_selectionDidChange_(self, browser, device):
@@ -105,7 +105,7 @@ def _scan_macos(on_done, on_error):
     view.setAutoresizingMask_(2 | 16)
     view.setTransferMode_(IKScannerDeviceViewTransferModeFileBased)
     view.setDownloadsDirectory_(NSURL.fileURLWithPath_(str(out_dir)))
-    view.setDocumentName_("colorhide-scan")
+    view.setDocumentName_("inkhue-scan")
     view.setDisplaysDownloadsDirectoryControl_(False)
     view.setDisplaysPostProcessApplicationControl_(False)
     view.setHasDisplayModeSimple_(True)
@@ -136,7 +136,7 @@ def _scan_windows(on_done, on_error):
     img = dlg.ShowAcquireImage(1, 2, 0, WIA_PNG, False, True, False)
     if img is None:
         return  # cancelled
-    path = Path(tempfile.mkdtemp(prefix="colorhide-scan-")) / "scan.png"
+    path = Path(tempfile.mkdtemp(prefix="inkhue-scan-")) / "scan.png"
     img.SaveFile(str(path))
     on_done(str(path))
 
@@ -237,7 +237,7 @@ class SaneDialog(QDialog):
         self.status.setText(f"{len(self.fields)} options")
 
     def start_scan(self):
-        path = Path(tempfile.mkdtemp(prefix="colorhide-scan-")) / "scan.png"
+        path = Path(tempfile.mkdtemp(prefix="inkhue-scan-")) / "scan.png"
         args = ["-d", self.device.currentData(), "--format=png", "-o", str(path)]
         for flag, (kind, w, _unit) in self.fields.items():
             val = w.currentText() if kind == "choice" else (f"{w.value():g}" if kind == "range" else w.text())

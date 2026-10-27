@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from colorhide.refiner import Refiner2, device  # noqa: E402
+from inkhue.refiner import Refiner2, device  # noqa: E402
 
 K = 4  # printer dots per cell side
 

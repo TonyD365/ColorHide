@@ -4,7 +4,7 @@ labels: [bug, triage]
 body:
   - type: markdown
     attributes:
-      value: Sorry it broke. The version is under the ColorHide logo in the app (e.g. v0.1.0).
+      value: Sorry it broke. The version is under the Inkhue logo in the app (e.g. v0.1.0).
   - type: dropdown
     id: os
     attributes:
@@ -15,7 +15,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: ColorHide version
+      label: Inkhue version
       placeholder: v0.1.0
     validations:
       required: true

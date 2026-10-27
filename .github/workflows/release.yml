@@ -64,8 +64,8 @@ jobs:
 
       - name: Stamp version from tag
         run: |
-          printf '__version__ = "%s"  # set by CI from the release tag\n' "${TAG#v}" > colorhide/_version.py
-          cat colorhide/_version.py
+          printf '__version__ = "%s"  # set by CI from the release tag\n' "${TAG#v}" > inkhue/_version.py
+          cat inkhue/_version.py
 
       - name: Linux Qt runtime libraries
         if: runner.os == 'Linux'
@@ -77,14 +77,14 @@ jobs:
           pip install -r requirements-app.txt pyinstaller
 
       - name: Build
-        run: pyinstaller packaging/ColorHide.spec --noconfirm
+        run: pyinstaller packaging/Inkhue.spec --noconfirm
 
       - name: Self-test the packaged app (encode, simulated print+scan, neural decode)
         run: |
           case "$RUNNER_OS" in
-            macOS)   APP=dist/ColorHide.app/Contents/MacOS/ColorHide ;;
-            Windows) APP=dist/ColorHide/ColorHide.exe ;;
-            *)       APP=dist/ColorHide/ColorHide ;;
+            macOS)   APP=dist/Inkhue.app/Contents/MacOS/Inkhue ;;
+            Windows) APP=dist/Inkhue/Inkhue.exe ;;
+            *)       APP=dist/Inkhue/Inkhue ;;
           esac
           "$APP" --self-test && echo "self-test passed"
 
@@ -93,24 +93,24 @@ jobs:
         run: |
           # free ad-hoc signature (no Apple Developer account); users approve the installer once in
           # System Settings > Privacy & Security > Open Anyway
-          codesign --force --deep --sign - dist/ColorHide.app
+          codesign --force --deep --sign - dist/Inkhue.app
           KEY="${{ matrix.key }}"
           packaging/macos/build_pkg.sh "$TAG" "${KEY#macos-}"
-          echo "ASSET=ColorHide-$TAG-$KEY.pkg" >> "$GITHUB_ENV"
+          echo "ASSET=Inkhue-$TAG-$KEY.pkg" >> "$GITHUB_ENV"
 
-      - name: Installer (Linux .deb -> /opt/ColorHide)
+      - name: Installer (Linux .deb -> /opt/Inkhue)
         if: runner.os == 'Linux'
         run: |
           packaging/linux/build_deb.sh "$TAG"
-          echo "ASSET=ColorHide-$TAG-linux-x64.deb" >> "$GITHUB_ENV"
+          echo "ASSET=Inkhue-$TAG-linux-x64.deb" >> "$GITHUB_ENV"
 
       - name: Installer (Windows setup.exe, Inno Setup)
         if: runner.os == 'Windows'
         run: |
           ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
           [ -x "$ISCC" ] || choco install innosetup -y --no-progress
-          "$ISCC" //Q "//DAppVersion=${TAG#v}" "//DTag=$TAG" packaging/windows/ColorHide.iss
-          echo "ASSET=ColorHide-$TAG-windows-x64-setup.exe" >> "$GITHUB_ENV"
+          "$ISCC" //Q "//DAppVersion=${TAG#v}" "//DTag=$TAG" packaging/windows/Inkhue.iss
+          echo "ASSET=Inkhue-$TAG-windows-x64-setup.exe" >> "$GITHUB_ENV"
 
       # Optional free Windows code signing through SignPath Foundation (open-source projects).
       # Runs only once the SIGNPATH_API_TOKEN secret and SIGNPATH_ORGANIZATION_ID variable are set.
@@ -127,7 +127,7 @@ jobs:
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ColorHide
+          project-slug: Inkhue
           signing-policy-slug: release-signing
           github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
           wait-for-completion: true
@@ -141,14 +141,14 @@ jobs:
         run: |
           test -f "$ASSET"
           sudo installer -pkg "$ASSET" -target /
-          /Applications/ColorHide.app/Contents/MacOS/ColorHide --self-test && echo "installed app OK"
+          /Applications/Inkhue.app/Contents/MacOS/Inkhue --self-test && echo "installed app OK"
 
       - name: Install it for real, then self-test the installed app (Linux)
         if: runner.os == 'Linux'
         run: |
           sudo apt-get install -y "./$ASSET"
-          test -f /usr/share/applications/colorhide.desktop
-          /opt/ColorHide/ColorHide --self-test && echo "installed app OK"
+          test -f /usr/share/applications/inkhue.desktop
+          /opt/Inkhue/Inkhue --self-test && echo "installed app OK"
 
       - name: Install it for real, then self-test the installed app (Windows)
         if: runner.os == 'Windows'
@@ -156,7 +156,7 @@ jobs:
         run: |
           $p = Start-Process -FilePath ".\$env:ASSET" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
-          $exe = "$env:LOCALAPPDATA\Programs\ColorHide\ColorHide.exe"
+          $exe = "$env:LOCALAPPDATA\Programs\Inkhue\Inkhue.exe"
           $t = Start-Process -FilePath $exe -ArgumentList '--self-test' -Wait -PassThru
           if ($t.ExitCode -ne 0) { throw "installed app self-test failed ($($t.ExitCode))" }
           "installed app OK"
@@ -191,7 +191,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "$TAG" --repo "${{ github.repository }}" --pattern 'ColorHide-*' --dir dl
-          cd dl && sha256sum ColorHide-* > ../SHA256SUMS.txt && cd ..
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern 'Inkhue-*' --dir dl
+          cd dl && sha256sum Inkhue-* > ../SHA256SUMS.txt && cd ..
           cat SHA256SUMS.txt
           gh release upload "$TAG" SHA256SUMS.txt --clobber --repo "${{ github.repository }}"

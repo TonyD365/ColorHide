@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ._version import __version__
 
-REPO = "TonyD365/ColorHide"
+REPO = "TonyD365/Inkhue"
 API = f"https://api.github.com/repos/{REPO}/releases/latest"
 
 
@@ -51,10 +51,10 @@ def installer_name(tag):
     """Must match what .github/workflows/release.yml uploads."""
     key = platform_key()
     if sys.platform == "darwin":
-        return f"ColorHide-{tag}-{key}.pkg"
+        return f"Inkhue-{tag}-{key}.pkg"
     if sys.platform == "win32":
-        return f"ColorHide-{tag}-{key}-setup.exe"
-    return f"ColorHide-{tag}-{key}.deb"
+        return f"Inkhue-{tag}-{key}-setup.exe"
+    return f"Inkhue-{tag}-{key}.deb"
 
 
 def frozen():
@@ -65,7 +65,7 @@ def install_path():
     """What gets replaced: the .app bundle on macOS, the program folder elsewhere."""
     exe = Path(sys.executable).resolve()
     if sys.platform == "darwin":
-        return exe.parents[2]  # ColorHide.app/Contents/MacOS/ColorHide
+        return exe.parents[2]  # Inkhue.app/Contents/MacOS/Inkhue
     return exe.parent
 
 
@@ -79,7 +79,7 @@ def _ssl_context():
 
 
 def _get(url, accept="application/vnd.github+json"):
-    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": f"ColorHide/{__version__}"})
+    req = urllib.request.Request(url, headers={"Accept": accept, "User-Agent": f"Inkhue/{__version__}"})
     return urllib.request.urlopen(req, timeout=30, context=_ssl_context())
 
 
@@ -100,7 +100,7 @@ def check():
 
 def download(info, progress=None):
     """Download and verify the installer; return its path (ready for apply())."""
-    work = Path(tempfile.mkdtemp(prefix="colorhide-update-"))
+    work = Path(tempfile.mkdtemp(prefix="inkhue-update-"))
     installer = work / info["name"]
     with _get(info["url"], "application/octet-stream") as r, open(installer, "wb") as f:
         total, done = int(r.headers.get("Content-Length") or 0), 0
@@ -140,10 +140,10 @@ tasklist /FI "PID eq {pid}" | find "{pid}" >nul && (timeout /t 1 /nobreak >nul &
 OK=
 if [ -O "$T" ] && [ -w "$(dirname "$T")" ]; then
     X=$(mktemp -d)
-    if /usr/sbin/pkgutil --expand-full {pkg} "$X/pkg" && [ -d "$X/pkg/ColorHide.pkg/Payload/ColorHide.app" ]; then
+    if /usr/sbin/pkgutil --expand-full {pkg} "$X/pkg" && [ -d "$X/pkg/Inkhue.pkg/Payload/Inkhue.app" ]; then
         rm -rf "$T.old"
         if mv "$T" "$T.old"; then  # only touch the old app once it is safely set aside
-            if /usr/bin/ditto "$X/pkg/ColorHide.pkg/Payload/ColorHide.app" "$T"; then
+            if /usr/bin/ditto "$X/pkg/Inkhue.pkg/Payload/Inkhue.app" "$T"; then
                 OK=1
                 rm -rf "$T.old"
             else
@@ -155,12 +155,12 @@ if [ -O "$T" ] && [ -w "$(dirname "$T")" ]; then
     rm -rf "$X"
 fi
 if [ -z "$OK" ]; then
-    {admin} && T=/Applications/ColorHide.app
+    {admin} && T=/Applications/Inkhue.app
 fi
 /usr/bin/open "$T"
 """
     return wait + f"""if command -v pkexec >/dev/null 2>&1 && pkexec dpkg -i {_q(installer)}; then
-    nohup /opt/ColorHide/ColorHide >/dev/null 2>&1 &
+    nohup /opt/Inkhue/Inkhue >/dev/null 2>&1 &
 else
     xdg-open https://github.com/{REPO}/releases/latest
 fi

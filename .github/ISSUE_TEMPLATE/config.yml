@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: 💬 Questions & ideas
-    url: https://github.com/TonyD365/ColorHide/discussions
+    url: https://github.com/TonyD365/Inkhue/discussions
     about: How do I…? Which printer works best? Share an idea before it becomes a feature request.
   - name: 🔒 Security issue
-    url: https://github.com/TonyD365/ColorHide/security/advisories/new
+    url: https://github.com/TonyD365/Inkhue/security/advisories/new
     about: Please report vulnerabilities privately.

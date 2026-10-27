@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from colorhide import updater
+from inkhue import updater
 
 
 def test_version_order():
@@ -13,14 +13,14 @@ def test_version_order():
 
 def test_asset_names_match_release_workflow():
     name = updater.installer_name("v1.0.0")
-    assert name.startswith("ColorHide-v1.0.0-") and name.split("-")[2] in ("macos", "windows", "linux")
+    assert name.startswith("Inkhue-v1.0.0-") and name.split("-")[2] in ("macos", "windows", "linux")
     root = Path(__file__).resolve().parents[1]
     wf = (root / ".github/workflows/release.yml").read_text()
     assert updater.platform_key() in wf
     # the updater downloads exactly the installers the release workflow and packaging scripts produce
     assert name.endswith((".pkg", "-setup.exe", ".deb"))
-    assert "build_pkg.sh" in wf and "build_deb.sh" in wf and "ColorHide-$TAG-windows-x64-setup.exe" in wf
-    assert 'OUT="ColorHide-$TAG-macos-$ARCH.pkg"' in (root / "packaging/macos/build_pkg.sh").read_text()
-    assert 'OUT="ColorHide-$TAG-linux-x64.deb"' in (root / "packaging/linux/build_deb.sh").read_text()
-    iss = (root / "packaging/windows/ColorHide.iss").read_text()
-    assert "OutputBaseFilename=ColorHide-{#Tag}-windows-x64-setup" in iss
+    assert "build_pkg.sh" in wf and "build_deb.sh" in wf and "Inkhue-$TAG-windows-x64-setup.exe" in wf
+    assert 'OUT="Inkhue-$TAG-macos-$ARCH.pkg"' in (root / "packaging/macos/build_pkg.sh").read_text()
+    assert 'OUT="Inkhue-$TAG-linux-x64.deb"' in (root / "packaging/linux/build_deb.sh").read_text()
+    iss = (root / "packaging/windows/Inkhue.iss").read_text()
+    assert "OutputBaseFilename=Inkhue-{#Tag}-windows-x64-setup" in iss

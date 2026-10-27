@@ -12,7 +12,7 @@ QtGui = pytest.importorskip("PySide6.QtGui")
 from PySide6.QtCore import QSizeF
 from PySide6.QtGui import QPageSize
 
-from colorhide.gui import sheet
+from inkhue.gui import sheet
 
 LETTER = QPageSize(QPageSize.Letter)
 
@@ -59,8 +59,8 @@ def test_pdf_round_trip(tmp_path):
     QApplication.instance() or QApplication([])
     import numpy as np
 
-    from colorhide import api
-    from colorhide.gui import media
+    from inkhue import api
+    from inkhue.gui import media
     y, x = np.mgrid[0:150, 0:220] / np.array([150, 220])[:, None, None]
     page, _ = api.encode((np.stack([x, y, 1 - x], -1) * 255).astype(np.uint8), width_in=2.5, dpi=600)
     s = sheet.SheetSettings(per_sheet=2)

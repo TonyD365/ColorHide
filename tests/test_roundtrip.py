@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from colorhide import api, channel  # noqa: E402
+from inkhue import api, channel  # noqa: E402
 
 
 def _photo(h=200, w=300):

@@ -1,12 +1,12 @@
 name: 🖨️ Print / scan report
-description: Share how ColorHide did with your real printer and scanner
+description: Share how Inkhue did with your real printer and scanner
 title: "[report] <printer> + <scanner>"
 labels: [real-world-test]
 body:
   - type: markdown
     attributes:
       value: |
-        Real printers and scanners are the best test ColorHide can get — thank you!
+        Real printers and scanners are the best test Inkhue can get — thank you!
         Results are collected under the `real-world-test` label.
   - type: input
     id: printer
@@ -38,7 +38,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: ColorHide version and OS
+      label: Inkhue version and OS
       placeholder: v0.1.0 on macOS 15
   - type: textarea
     id: notes

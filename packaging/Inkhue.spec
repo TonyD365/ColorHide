@@ -1,11 +1,11 @@
 # PyInstaller spec for the desktop app (macOS .app, Windows/Linux folder).
-#   pyinstaller packaging/ColorHide.spec --noconfirm
+#   pyinstaller packaging/Inkhue.spec --noconfirm
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(SPECPATH).parent
-VERSION = re.search(r'"(.+?)"', (ROOT / "colorhide" / "_version.py").read_text()).group(1)
+VERSION = re.search(r'"(.+?)"', (ROOT / "inkhue" / "_version.py").read_text()).group(1)
 
 hidden = []
 if sys.platform == "darwin":
@@ -23,16 +23,16 @@ a = Analysis(
               "PIL", "tkinter", "pytest", "IPython"],
 )
 pyz = PYZ(a.pure)
-exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="ColorHide", console=False,
+exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="Inkhue", console=False,
           target_arch=None, codesign_identity=None, icon=str(ROOT / "assets" / "icon.ico"))
-coll = COLLECT(exe, a.binaries, a.datas, name="ColorHide")
+coll = COLLECT(exe, a.binaries, a.datas, name="Inkhue")
 
 if sys.platform == "darwin":
     app = BUNDLE(
         coll,
-        name="ColorHide.app",
+        name="Inkhue.app",
         icon=str(ROOT / "assets" / "icon.icns"),
-        bundle_identifier="io.github.tonyd365.colorhide",
+        bundle_identifier="io.github.tonyd365.inkhue",
         version=VERSION,
         info_plist={
             "CFBundleShortVersionString": VERSION,

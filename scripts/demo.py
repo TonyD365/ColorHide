@@ -14,7 +14,7 @@ from skimage import color as skcolor
 from skimage import data as skdata
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from colorhide import channel, codec, payload  # noqa: E402
+from inkhue import channel, codec, payload  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "out"
 
@@ -48,7 +48,7 @@ def main():
     args = ap.parse_args()
     ref = None
     if args.refiner:
-        from colorhide.refiner import load as load_refiner
+        from inkhue.refiner import load as load_refiner
         ref = load_refiner(args.refiner)
     OUT.mkdir(exist_ok=True)
 

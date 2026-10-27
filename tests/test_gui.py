@@ -25,9 +25,9 @@ def _wait(app, cond, timeout=120):
 
 def test_app_cycle(tmp_path):
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
-    from colorhide.gui import media
-    from colorhide.gui.main import Printer
-    from colorhide.gui.printpanel import PrintPanel
+    from inkhue.gui import media
+    from inkhue.gui.main import Printer
+    from inkhue.gui.printpanel import PrintPanel
 
     y, x = np.mgrid[0:240, 0:360] / np.array([240, 360])[:, None, None]
     photo = tmp_path / "photo.png"
@@ -51,7 +51,7 @@ def test_app_cycle(tmp_path):
         media.save_color(w.color, tmp_path / f"out.{ext}")
         assert (tmp_path / f"out.{ext}").stat().st_size > 1000
 
-    from colorhide.gui.viewer import Viewer
+    from inkhue.gui.viewer import Viewer
     v = Viewer(w, media.gray_to_qimage(w.page), "page")  # full-resolution zoom view
     v.show()
     v.view.zoom(4.0)

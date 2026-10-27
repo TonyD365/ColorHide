@@ -1,6 +1,6 @@
 #!/bin/sh
 # Hand the installed app to the logged-in user so in-app updates can replace it without a password.
-APP="$2/ColorHide.app"
+APP="$2/Inkhue.app"
 USER_NAME=$(stat -f %Su /dev/console)
 if [ -d "$APP" ] && [ -n "$USER_NAME" ] && [ "$USER_NAME" != "root" ]; then
     chown -R "$USER_NAME":staff "$APP"

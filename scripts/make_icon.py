@@ -1,4 +1,4 @@
-"""Draw the ColorHide icon: a sheet coming out of a printer slot, covered in one halftone dot
+"""Draw the Inkhue icon: a sheet coming out of a printer slot, covered in one halftone dot
 pattern that is black-and-white on one side of the diagonal and full color on the other.
 
 Writes assets/icon.png (1024), icon.icns (macOS, needs iconutil), icon.ico (Windows) and
@@ -100,8 +100,8 @@ def social(icon_img):
             break
         except OSError:
             continue
-    d.text((590, 210), "Color", font=font, fill=ACCENT)
-    d.text((590 + d.textlength("Color", font=font), 210), "Hide", font=font, fill=(240, 238, 232))
+    d.text((590, 210), "Ink", font=font, fill=(240, 238, 232))
+    d.text((590 + d.textlength("Ink", font=font), 210), "hue", font=font, fill=ACCENT)
     d.text((594, 340), "Print color photos as plain black-and-white.\nScan them back to color.",
            font=small, fill=(170, 172, 178), spacing=12)
     return bg.convert("RGB")

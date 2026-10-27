@@ -1,8 +1,8 @@
 """Command line interface. Prints one JSON line.
 
-  python -m colorhide.cli encode photo.jpg page.png --width-in 6 [--dpi 600]
-  python -m colorhide.cli decode scan.png color.png [--refiner models/refiner.pt | --no-refiner]
-  python -m colorhide.cli simulate page.png scan.png   # software print+scan, for testing without hardware
+  python -m inkhue.cli encode photo.jpg page.png --width-in 6 [--dpi 600]
+  python -m inkhue.cli decode scan.png color.png [--refiner models/refiner.pt | --no-refiner]
+  python -m inkhue.cli simulate page.png scan.png   # software print+scan, for testing without hardware
 """
 import argparse
 import json
@@ -49,7 +49,7 @@ def simulate(args):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="colorhide")
+    ap = argparse.ArgumentParser(prog="inkhue")
     sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("encode", help="color image -> black-and-white page hiding the color")
     e.add_argument("input")
