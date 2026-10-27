@@ -50,6 +50,9 @@ CONDITIONS = {
     "typical": dict(scale=2.0, rotate=1.5, persp=0.004, blur=0.7, dot_gain=0.15, noise=0.03, gamma=1.1, jpeg=90),
     "harsh": dict(scale=1.6, rotate=2.5, persp=0.008, blur=1.0, dot_gain=0.25, noise=0.05, gamma=1.3, jpeg=75),
     "600dpi scan": dict(scale=1.0, rotate=0.5, persp=0.002, blur=0.6, dot_gain=0.1, noise=0.02, gamma=1.0, jpeg=92),
+    # the supported minimum scan resolution
+    "400dpi scan": dict(scale=400 / 600, rotate=1.5, persp=0.004, blur=0.7, dot_gain=0.15, noise=0.03, gamma=1.1,
+                        jpeg=90),
     # typical, plus pen marks: 30 strokes over the image and 4 across the frame / timing track
     "handwriting": dict(scale=2.0, rotate=1.5, persp=0.004, blur=0.7, dot_gain=0.15, noise=0.03, gamma=1.1, jpeg=90,
                         scribble=True),

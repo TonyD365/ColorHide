@@ -4,171 +4,251 @@
 
 # Inkhue
 
-**Print a color photo as a plain-looking black-and-white page. Scan it, and the color comes back.**
+### A black-and-white print that carries its own color.
+
+Print a color photo or document on **any black-and-white printer**. It looks like an ordinary grayscale page.<br>
+Scan it, and Inkhue brings the color back.
 
 [![Release](https://img.shields.io/github/v/release/TonyD365/Inkhue?color=ee6b33&label=release)](https://github.com/TonyD365/Inkhue/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/TonyD365/Inkhue/ci.yml?branch=main&label=CI)](https://github.com/TonyD365/Inkhue/actions/workflows/ci.yml)
-[![Build](https://img.shields.io/github/actions/workflow/status/TonyD365/Inkhue/release.yml?label=release%20build)](https://github.com/TonyD365/Inkhue/actions/workflows/release.yml)
 [![Downloads](https://img.shields.io/github/downloads/TonyD365/Inkhue/total?color=6c5ce7)](https://github.com/TonyD365/Inkhue/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a7bd5)](LICENSE)
 ![Platforms](https://img.shields.io/badge/macOS%20·%20Windows%20·%20Linux-555)
 
-[Download](#download) · [How it works](#how-it-works) · [Printing tips](#printing-and-scanning-tips) · [Build from source](#build-from-source) · [中文说明](README.zh-CN.md)
+[Download](#download) · [How to use](#how-to-use) · [How it works](#how-it-works) · [Benchmark](#benchmark) · [Wiki](https://github.com/TonyD365/Inkhue/wiki) · [中文说明](README.zh-CN.md)
 
 <img src="assets/reveal.gif" width="540" alt="A black-and-white printout being scanned back into color">
 
 <img src="assets/compare.png" alt="Original photo, the black-and-white printout, and the color recovered from a scan">
 
-<sub>Left: original. Middle: what gets printed (any black-and-white laser printer; inset: the actual dots). Right: color recovered from the scan at 2× resolution. In the app, double-click any sheet to zoom to full resolution.</sub>
+<sub>Original · what gets printed (inset: the actual printer dots) · color recovered from the scan, at 2× resolution.</sub>
 
 </div>
 
 ---
 
-## Why
+## What it is
 
-Black-and-white printing is cheap and everywhere. Color is not. Inkhue stores a photo's color **inside the
-microscopic arrangement of the printer dots**: to the eye the page is an ordinary grayscale halftone, but a scanner
-can read the color back out. No secret key, nothing encrypted — the format is open and anyone can decode it.
-
-<div align="center"><img src="assets/screenshot.png" width="760" alt="The Inkhue app"></div>
+- **Prints on any black-and-white printer.** The page is an ordinary-looking grayscale halftone.
+- **The color is in the dots.** Which way the ink leans inside each tiny cell of printer dots stores the photo's
+  color — for *every region* of the picture, aligned with it, not in a code in the corner.
+- **Scan it back.** 600 dpi (400 at least) on any flatbed or multifunction printer. Inkhue finds the page, reads the
+  dots, corrects errors and restores the color.
+- **Open.** No key, no encryption, no account. The format is public and anyone can decode a page — "hidden" means
+  hidden from the eye, not from people.
 
 ## Gallery
 
 <div align="center"><img src="assets/gallery.png" alt="Original, black-and-white print and recovered color for three photos"></div>
 
-<sub>Original · what gets printed · color recovered from the scan. Bottom row: the printout was written on with a pen —
-the color still comes back, and the handwriting stays, just as it is on the paper. Photos: public domain / CC0
-(NASA, scikit-image).</sub>
-
-### Documents too
+<sub>Original · printed · recovered. Bottom row: someone wrote on the printout with a pen — the color still comes back,
+and the handwriting stays, just as it is on the paper.</sub>
 
 <div align="center"><img src="assets/document.png" alt="A page of notes with a highlighter mark and a colored chart, printed in black and white and recovered in color"></div>
 
-<sub>Mostly white pages — notes, worksheets, slides — keep their highlights, colored text and charts.</sub>
+<sub>Documents too: notes, worksheets and slides keep their highlights, colored text and charts.
+Photos: public domain / CC0 (NASA, scikit-image).</sub>
+
+## How to use
+
+1. **Install** Inkhue for your system ([download](#download)).
+2. **Hide color** — load a photo, image or PDF. Inkhue makes the black-and-white page, as large as fits on your paper.
+3. **Print** it from Inkhue's print panel at **100 % scale** (the default).
+4. **Reveal color** — scan the printout in grayscale at **600 dpi** (400 at least), straight from your scanner in
+   Inkhue or by importing the scan. The color comes back; export it as PNG, JPEG, PDF and more.
+
+Upside down, a little crooked, written on? All fine.
+
+<div align="center"><img src="assets/screenshot.png" width="720" alt="The Inkhue app after revealing the color of a scanned page"></div>
 
 ## Features
 
-- 🖨️ **Printer-style desktop app** for macOS, Windows and Linux
-- 🎨 **Hide color** in a black-and-white page, **reveal color** from a scan
-- 🖨️ **Built-in print panel with live preview** — destination (any printer, or Save as PDF), copies, layout,
-  color, paper size, pages per sheet, margins, scale, two-sided, headers and footers, plus every option of the
-  printer's own driver. Jobs go straight to the print system at 100 % scale
-- 🔍 Scan straight from your **scanner or multifunction printer** (ImageKit on macOS, WIA on Windows, SANE on Linux), or import a PDF / image
-- 💾 Export the recovered photo as **PDF, PNG, JPEG, TIFF, WebP, HEIC, JPEG 2000, BMP**…
-- 🧠 Optional **neural refiner** (small U-Net, runs on CPU via ONNX Runtime) removes grain and sharpens color
-- 🛡️ Reed-Solomon error correction + redundancy survive smudges, skew and scanner noise
-- 📦 Real **installers**: `.pkg` into Applications on macOS, `setup.exe` on Windows, `.deb` on Ubuntu/Debian
-- 🔄 **Auto-updates** from the latest GitHub release with the same installers, verified by SHA-256
+- 🖨️ **Printer-style app** for macOS, Windows and Linux
+- 🎨 **Photos and documents** — mostly white pages work as well as photos
+- 🧠 **Neural refiner** (small U-Net, CPU via ONNX Runtime) — removes grain, sharpens color, outputs **2× resolution**
+- 🖨️ **Print panel with live preview** — every printer and driver option, Save as PDF, layout, paper, pages per sheet,
+  margins, scale, two-sided, headers and footers; jobs go straight to the print system at 100 %
+- 🔍 **Scan from the app** — ImageKit on macOS, WIA on Windows, SANE on Linux — or import a PDF / image
+- ✍️ **Robust** — Reed-Solomon error correction and redundancy survive pen marks, smudges, tilt, upside-down scans;
+  areas too damaged to correct stay gray instead of turning into random color
+- 📐 **Fill the paper** — prints each photo as large as the paper allows
+- 💾 **Export** the recovered photo as PDF, PNG, JPEG, TIFF, WebP, HEIC, JPEG 2000, BMP…
+- 📦 **Real installers** and 🔄 **automatic updates**, verified by SHA-256
 
 ## Download
 
 | Platform | Installer | Installs to |
 |---|---|---|
-| macOS (Apple silicon) | `Inkhue-vX.Y.Z-macos-arm64.pkg` | `/Applications` |
-| macOS (Intel) | `Inkhue-vX.Y.Z-macos-x64.pkg` | `/Applications` |
-| Windows 10/11 (64-bit) | `Inkhue-vX.Y.Z-windows-x64-setup.exe` | your user's programs folder (or *Program Files* for all users), Start-menu entry, uninstaller |
-| Ubuntu / Debian (x86-64) | `Inkhue-vX.Y.Z-linux-x64.deb` | `/opt/Inkhue`, app-menu entry, `inkhue` command |
+| macOS (Apple silicon) | `Inkhue-vX.Y.Z-macos-arm64.pkg` | Applications |
+| macOS (Intel) | `Inkhue-vX.Y.Z-macos-x64.pkg` | Applications |
+| Windows 10/11 (64-bit) | `Inkhue-vX.Y.Z-windows-x64-setup.exe` | your programs folder (or Program Files for all users) |
+| Ubuntu / Debian (x86-64) | `Inkhue-vX.Y.Z-linux-x64.deb` | `/opt/Inkhue`, app menu, `inkhue` command |
 
-Get them from the [latest release](https://github.com/TonyD365/Inkhue/releases/latest). Every file has a
-SHA-256 in `SHA256SUMS.txt` and a [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)
+From the [latest release](https://github.com/TonyD365/Inkhue/releases/latest). Every file is listed in
+`SHA256SUMS.txt` and carries a [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)
 (`gh attestation verify <file> -R TonyD365/Inkhue`).
 
 <details>
-<summary><b>Installing: the installers are not code-signed by a paid certificate</b></summary>
+<summary><b>First install: the installers aren't signed with a paid certificate</b></summary>
 
-**macOS** — open the `.pkg`. The first time, macOS refuses it: open **System Settings → Privacy & Security**,
-scroll down, click **Open Anyway**, then follow the installer. Inkhue lands in **Applications**. You only do this
-once; updates install by themselves, without a password.
+**macOS** — open the `.pkg`. The first time, macOS refuses it: **System Settings → Privacy & Security → Open
+Anyway**, then follow the installer. Once only; updates install themselves without a password.
 
-**Windows** — run the `setup.exe`. If SmartScreen appears, click **More info → Run anyway**. No administrator rights
-needed unless you choose to install for all users.
+**Windows** — run the `setup.exe`. If SmartScreen appears: **More info → Run anyway**.
 
-**Ubuntu / Debian** — `sudo apt install ./Inkhue-*.deb` (or double-click it). Then start *Inkhue* from the app
-menu or run `inkhue`. Scanning uses SANE (`sudo apt install sane-utils`); updates ask for your password.
+**Ubuntu / Debian** — `sudo apt install ./Inkhue-*.deb`. Scanning uses SANE: `sudo apt install sane-utils`.
 </details>
+
+More help: [installation](https://github.com/TonyD365/Inkhue/wiki/Installation) ·
+[printing and scanning](https://github.com/TonyD365/Inkhue/wiki/Printing-and-Scanning) ·
+[troubleshooting](https://github.com/TonyD365/Inkhue/wiki/Troubleshooting) · [FAQ](https://github.com/TonyD365/Inkhue/wiki/FAQ)
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A[Color photo] --> Y[Luminance Y]
-    A --> C[Color Cb/Cr<br/>1/8 resolution, 6 bit]
-    C --> RS[Reed-Solomon<br/>+ repetition + scatter]
-    Y --> H{{4×4-dot halftone cell}}
+    A[Color image] --> Y[Brightness]
+    A --> C[Color, 1/8 resolution]
+    C --> RS[Reed-Solomon + repetition<br/>+ public scatter]
+    Y --> H{{4×4-dot cells}}
     RS --> H
-    H -->|dot count = gray<br/>growth corner = 2 bits| P[B/W page]
-    P --> S[Scan]
-    S --> D[Locate frame,<br/>read cells]
-    D --> N[Neural refiner]
-    N --> O[Color photo]
+    H -->|dot count = brightness<br/>ink lean = 2 bits| P[Black-and-white page]
+    P --> S[Scan] --> D[Find frame, read cells,<br/>correct errors] --> N[Neural refiner] --> O[Color image, 2×]
 ```
 
-| Layer | What it does |
-|---|---|
-| **Data halftone** | Every pixel becomes a 4×4 cell of printer dots (1/150 inch at 600 dpi). *How many* dots are inked sets the gray level; *which corner* the ink leans towards carries 2 bits. Pages that are mostly white paper (documents) keep at least one dot in every cell, so blank areas carry data too. Inside each cell the dots are placed where the full-resolution photo is darkest, so edges stay sharp, while the ink's centre of mass still leans clearly enough towards the data corner. The eye only sees gray. |
-| **Color payload** | Cb/Cr at 1/8 resolution, 6-bit, protected by Reed-Solomon and repeated across the page. A fixed, public permutation spreads every byte over the whole sheet so local damage never destroys a region. |
-| **Neural refiner** | A small U-Net (≈1 M parameters) trained on [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/) through a simulated print/scan channel. It reads the scan dot by dot — including the detail the halftone placed inside each cell — and outputs color at **2× the cell resolution** (300 ppi for a 600 dpi print), removing grain, correcting toner spread and sharpening the color along luminance edges. |
-| **Frame** | A thin border to find the page in a scan and a timing track to count the grid. |
+### 1. Cells and brightness
+
+A 600 dpi printer can only put a dot or leave paper white. Inkhue groups the dots into **cells of 4×4 dots**
+(1/150 inch). Each image pixel becomes one cell, and its brightness is the **number of inked dots**, 0 to 16 — the
+same idea as an ordinary halftone. Error diffusion spreads the rounding error to neighbouring cells so smooth
+gradients stay smooth.
+
+*Which* of the 16 positions get ink is chosen from the image at full printer resolution: dots go where the picture is
+darkest inside the cell, so edges and fine detail survive inside a cell instead of being averaged away.
+
+### 2. Two bits in every cell
+
+The arrangement also carries data. The **centre of mass of the ink** in a cell leans towards one of its four corners:
+left/right is one bit, top/bottom is another. The placement in step 1 is only allowed to choose arrangements whose
+centre of mass leans clearly enough (a safety margin) towards the corner the data asks for; the eye, seeing a 1/150-inch
+cell from reading distance, can't tell the difference.
+
+That is **2 bits per cell, about 45,000 bits (5.6 KB) per square inch** at 600 dpi — and the bits sit inside the
+picture, region by region, not in a separate code.
+
+### 3. Documents: blank paper must carry data too
+
+A cell with 0 dots (white paper) or 16 dots (solid black) has no corner to lean towards, so it can't carry bits. Photos
+have few such cells; a page of notes is mostly white. When more than 20 % of a page would be empty or full, Inkhue
+keeps **1 to 15 dots in every cell**: blank paper gets one faint dot per cell and carries data like everything else.
+A flag in the header tells the decoder to rescale brightness, so white comes back white.
+
+### 4. The color payload
+
+- The image is split into brightness (printed as the dots themselves) and color (Cb/Cr). People see brightness detail
+  far better than color detail — JPEG and TV rely on the same fact — so color is stored at **1/8 resolution**,
+  **6 bits** per value.
+- A small **header** (format version, color resolution, flags) is protected by Reed-Solomon and stored 48 times.
+- The color data is split into **Reed-Solomon** blocks (255 bytes, up to 16 wrong bytes corrected per block) and
+  **repeated** as many times as the page has room for — typically 9 copies.
+- Every bit is then placed by a **fixed, public permutation** across the whole page, and whitened, so that a smudge,
+  a fold or handwriting removes a little of every copy instead of all of one region, and so that repeated data never
+  forms a visible pattern. The permutation's seed is part of the format and never changes: nothing is secret.
+
+### 5. Frame and geometry
+
+The page is surrounded by a white margin, a **2-cell black frame**, a **timing track** of alternating black and white
+cells along the top and left, and a white gap.
+
+1. The frame is the largest dark outline in the scan; its four sides are fitted with robust line fits (pen strokes
+   touching it are ignored) and intersected for sub-pixel corners.
+2. The page is straightened with a perspective transform — tilt and keystone are corrected.
+3. The **grid size** comes from the timing track: its black/white alternation is a wave, and its period, measured from
+   the spectrum over the whole track, gives the cell size to about 0.1 % — precise enough at 400 dpi, where a cell is
+   only ~2.7 scan pixels.
+4. If the header doesn't check out, neighbouring grid sizes are tried, then the scan turned by 90°, 180° and 270°
+   (paper put in sideways or upside down). The header's Reed-Solomon check confirms the right one.
+5. The page is resampled (cubic interpolation) to exactly one pixel per printer dot.
+
+### 6. Reading the cells and correcting errors
+
+For every cell Inkhue measures the ink (→ brightness) and the ink's centre of mass (→ two *soft* bits: not just 0 or 1,
+but how confidently). Slow drifts from imperfect alignment are removed. All copies of each bit are added up, weighted
+by confidence, then Reed-Solomon corrects what's left. A block that is still too damaged leaves its part of the picture
+**gray** instead of filling it with random color.
+
+### 7. The neural refiner
+
+Decoded straight, the photo would be grainy and the color soft (1/8 resolution). A small **U-Net** (≈1 million
+parameters) reads the scan **dot by dot** together with the decoded color and outputs the photo at **2× the cell
+resolution** (300 ppi for a 600 dpi print). It learns to remove the halftone grain, undo toner spread, read the detail
+that step 1 put inside each cell, and sharpen the color along brightness edges. It was trained on the 800 DIV2K photos
+and synthetic documents (colored text, highlights, charts), printed and scanned through a simulator with random
+printer and scanner settings. It ships as a 4 MB ONNX model and runs on the CPU in about a second.
+
+### 8. Testing, and the limits
+
+The **simulator** reproduces toner spread, uneven coverage, paper noise, rotation, keystone, optical blur, tone curves,
+sensor noise and JPEG compression; the benchmark runs every change through it at several strengths.
+
+- **Scan resolution**: the data lives in single 1/600-inch dots. At 400 dpi a dot is ~0.7 scan pixels — the lowest
+  that works reliably; at 300 dpi the dots blur together. Scanning at 150–300 dpi (or with a phone) needs larger
+  cells — planned.
+- **Thin colored text** comes back paler than the original: an 8×8-cell color sample mixes the stroke with the
+  surrounding paper. A per-document color palette is planned.
+- **Scale**: printing at anything but 100 % resamples the dots, so the color usually won't decode.
+
+**How it differs from QR codes and watermarks:** those store a few bytes to a few kilobytes, either next to the image
+or as a faint signature inside it. Inkhue stores information **for every region of the picture** while the page itself
+stays a clear photograph.
 
 ## Benchmark
 
-Every pull request is benchmarked against `main`: 4 public-domain photos × 3 seeds, through a simulated printer
-and scanner under four conditions ([`scripts/benchmark.py`](scripts/benchmark.py)). Current `main`:
+Every pull request is benchmarked against `main`: 4 public-domain photos and a text document × 3 seeds, through a
+simulated printer and scanner ([`scripts/benchmark.py`](scripts/benchmark.py)). Current `main`:
 
-Print sharpness (SSIM of the page as the eye sees it vs. the photo): **0.242** · neural output: **2× cell resolution**
+| Condition | Decoded | Raw bit errors | ΔE neural | Detail (PSNR @2×) |
+|---|---|---|---|---|
+| ideal | 100 % | 8.4 % | 2.66 | 28.8 dB |
+| typical | 100 % | 8.1 % | 2.52 | 29.2 dB |
+| 600 dpi scan | 100 % | 7.8 % | 2.91 | 28.1 dB |
+| 400 dpi scan | 100 % | 12.7 % | 3.25 | 27.1 dB |
+| handwriting on the page | 100 % | 9.4 % | 3.31 | 22.9 dB |
+| harsh (poor print + scan) | 80 % | 19.9 % | 6.65 | 21.9 dB |
 
-| Condition | Decoded | Raw bit errors | ΔE classic | ΔE neural | Detail (PSNR @2×) |
-|---|---|---|---|---|---|
-| ideal | 100 % | 4.3 % | 2.81 | 2.98 | 29.1 dB |
-| typical | 100 % | 9.3 % | 5.54 | 3.01 | 28.9 dB |
-| 600 dpi scan | 92 % | 9.5 % | 4.70 | 3.07 | 28.6 dB |
-| harsh | 33 % | 23.3 % | 13.00 | 8.20 | 20.3 dB |
+ΔE is CIEDE2000 color error (≈2 is barely visible). These are simulations; real-world reports are the most valuable
+contribution — see below.
 
-ΔE is CIEDE2000 color error (≈2 is barely visible). Improving *harsh* and *600 dpi scan* is the open challenge —
-PRs welcome.
+## Tips
 
-## Printing and scanning tips
+- Print at **100 % scale**, at the printer's native **600 dpi**, plain paper. Laser printers give the cleanest dots;
+  turn off toner saving and photo enhancement.
+- Scan in **grayscale at 600 dpi** (400 at least), sharpening and descreening off. Keep the whole black frame in the scan.
+- Bigger prints come back sharper and tolerate more damage.
 
-- Print at the printer's **native resolution (600 dpi)** and **100 % scale** — turn off *Fit to page* and any photo enhancement.
-  Laser printers work best.
-- Scan in **grayscale at 600 dpi** (at least 400), with sharpening and descreening off.
-- Keep the black frame fully inside the scan.
+## Roadmap
+
+- **Self-locating tiles** — a page can mix Inkhue images with ordinary text; each tile decodes on its own, damaged
+  tiles simply stay black and white.
+- **Document palette** — exact colors for thin colored text.
+- **Large-cell mode** — scans at 150–300 dpi and, later, phone photos, trading resolution for convenience.
+- **Real-printer calibration** from community print/scan reports.
 
 ## Build from source
 
 ```bash
 git clone https://github.com/TonyD365/Inkhue && cd Inkhue
-python3 -m venv .venv && .venv/bin/pip install -r requirements-app.txt
-.venv/bin/python -m inkhue            # the app
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-app.txt
+.venv/bin/python -m inkhue                                   # the app
+.venv/bin/python -m inkhue.cli encode photo.jpg page.png     # command line: encode / simulate / decode
 ```
 
-Command line:
-
-```bash
-python -m inkhue.cli encode photo.jpg page.png --width-in 6      # hide
-python -m inkhue.cli simulate page.png scan.png                  # software print + scan
-python -m inkhue.cli decode scan.png color.png                   # reveal
-```
-
-Train the refiner (uses Apple GPU / CUDA if available):
-
-```bash
-pip install -r requirements.txt
-python scripts/make_dataset.py data/div2k/DIV2K_valid_HR --crops 24 --size 128
-python scripts/train.py --steps 4000
-python -m inkhue.refiner_onnx models/refiner.pt models/refiner.onnx
-```
-
-Package the app: `pyinstaller packaging/Inkhue.spec`. Releases are built by
-[GitHub Actions](.github/workflows/release.yml) whenever a release is published; the tag (`v1.2.3`) is the version.
+Tests, benchmark, training the refiner and releasing: [Development](https://github.com/TonyD365/Inkhue/wiki/Development).
 
 ## Format stability
 
-Pages printed today must still decode in ten years. The constants in
-[`inkhue/payload.py`](inkhue/payload.py) — above all `SEED` — are frozen and pinned by
-[`tests/test_format.py`](tests/test_format.py). Any change to the on-paper format needs a new `VERSION` and a decoder
-that still reads the old one.
+Pages printed today must still decode in ten years. The format constants — above all the scatter `SEED` — are frozen
+and pinned by [`tests/test_format.py`](tests/test_format.py); every change since 1.0 has been backwards compatible.
 
 ## Related work
 
@@ -179,11 +259,12 @@ that still reads the old one.
 
 ## Contributing
 
-Issues and pull requests are welcome — especially **real-world print/scan results**
-([report template](https://github.com/TonyD365/Inkhue/issues/new?template=print-scan-report.yml)).
-See [CONTRIBUTING.md](CONTRIBUTING.md); security issues go through [SECURITY.md](SECURITY.md).
+The most useful thing you can do: **print a page and scan it**, then share the result with the
+[🖨️ print / scan report](https://github.com/TonyD365/Inkhue/issues/new?template=print-scan-report.yml) template.
+Code contributions: see [CONTRIBUTING.md](CONTRIBUTING.md). Questions and ideas:
+[Discussions](https://github.com/TonyD365/Inkhue/discussions). Security: [SECURITY.md](SECURITY.md).
 
 ## License
 
-[Apache-2.0](LICENSE). Free to use, modify and ship, including commercially. Published openly so that the method stays
-free for everyone.
+[Apache-2.0](LICENSE) — free to use, modify and ship, including commercially. Published openly so the method stays
+free for everyone. Inkhue was called ColorHide until version 1.1.
