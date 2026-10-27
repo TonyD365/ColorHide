@@ -25,10 +25,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.TAG }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON }}
       - run: pip install numpy opencv-python-headless reedsolo onnxruntime pytest
@@ -49,15 +49,17 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ env.TAG }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON }}
 
       - name: Stamp version from tag
-        run: echo "__version__ = \"${TAG#v}\"  # set by CI from the release tag" > colorhide/_version.py
+        run: |
+          printf '__version__ = "%s"  # set by CI from the release tag\n' "${TAG#v}" > colorhide/_version.py
+          cat colorhide/_version.py
 
       - name: Linux Qt runtime libraries
         if: runner.os == 'Linux'
