@@ -86,17 +86,38 @@ def encode_bits(q, factor, qbits, capacity):
     return out, reps
 
 
+def _header(s, nh):
+    """(factor, qbits) from the header copies at the start of the stream, or None."""
+    hdr_soft = s[:nh].reshape(HDR_REPS, -1).sum(0)
+    try:
+        hdr = _hdr_rs.decode(np.packbits(hdr_soft > 0).tobytes())[0]
+    except ReedSolomonError:
+        return None
+    if hdr[:2] != MAGIC or hdr[2] != VERSION:
+        return None
+    return hdr[3], hdr[4]
+
+
+def has_header(soft):
+    """True if these soft bits carry a valid ColorHide header: confirms the grid was read right."""
+    perm, white = _layout(soft.size)
+    nh = _hdr_bits() * HDR_REPS
+    if soft.size < nh:
+        return False
+    s = soft[perm[:nh]] * (1.0 - 2.0 * white[perm[:nh]])  # only the header's share of the stream
+    return _header(s, nh) is not None
+
+
 def decode_soft(soft, h, w):
     """soft: per cell-bit value, >0 means bit 1. Returns (Cb/Cr small, info dict)."""
     capacity = soft.size
     perm, white = _layout(capacity)
     s = soft[perm] * (1.0 - 2.0 * white[perm])  # stream order, whitening removed
     nh = _hdr_bits() * HDR_REPS
-    hdr_soft = s[:nh].reshape(HDR_REPS, -1).sum(0)
-    hdr = _hdr_rs.decode(np.packbits(hdr_soft > 0).tobytes())[0]
-    if hdr[:2] != MAGIC or hdr[2] != VERSION:
+    hdr = _header(s, nh)
+    if hdr is None:
         raise ValueError("no ColorHide header found")
-    factor, qbits = hdr[3], hdr[4]
+    factor, qbits = hdr
     ch, cw = chroma_shape(h, w, factor)
     count = ch * cw * 2
     nbytes = -(-count * qbits // 8)

@@ -34,6 +34,9 @@ CONDITIONS = {
     "typical": dict(scale=2.0, rotate=1.5, persp=0.004, blur=0.7, dot_gain=0.15, noise=0.03, gamma=1.1, jpeg=90),
     "harsh": dict(scale=1.6, rotate=2.5, persp=0.008, blur=1.0, dot_gain=0.25, noise=0.05, gamma=1.3, jpeg=75),
     "600dpi scan": dict(scale=1.0, rotate=0.5, persp=0.002, blur=0.6, dot_gain=0.1, noise=0.02, gamma=1.0, jpeg=92),
+    # typical, plus pen marks: 30 strokes over the image and 4 across the frame / timing track
+    "handwriting": dict(scale=2.0, rotate=1.5, persp=0.004, blur=0.7, dot_gain=0.15, noise=0.03, gamma=1.1, jpeg=90,
+                        scribble=True),
 }
 
 
@@ -76,8 +79,14 @@ def run():
         small = cv2.resize(ycc[..., 1:], (sh[1], sh[0]), interpolation=cv2.INTER_AREA)
         sent, _ = payload.encode_bits(payload.quantize(small.transpose(2, 0, 1), 6), 8, 6, ch * cw * 2)
         for cond, params in CONDITIONS.items():
+            params = dict(params)
+            marked = page
+            if params.pop("scribble", False):
+                if not hasattr(channel, "scribble"):
+                    continue  # older code under test has no pen-mark simulator
+                marked = channel.scribble(page, np.random.default_rng(100 + SEEDS[0]))
             for seed in SEEDS:
-                scan = channel.print_scan(page, seed=seed, **params)
+                scan = channel.print_scan(marked, seed=seed, **params)
                 row = dict(image=name, condition=cond, seed=seed, encode_s=t_enc, ok=False, print_ssim=sharp)
                 try:
                     _, soft, h, w = codec.demodulate(scan)
@@ -108,6 +117,10 @@ def summarize(result):
     out = {}
     for cond in CONDITIONS:
         rs = [r for r in result["rows"] if r["condition"] == cond]
+        if not rs:
+            out[cond] = dict.fromkeys(["success", "ber", "de_classic", "de_neural", "psnr2x_classic",
+                                       "psnr2x_neural", "decode_s"])
+            continue
         def mean(k, rs=rs):
             vals = [r[k] for r in rs if k in r]
             return float(np.mean(vals)) if vals else None
@@ -174,7 +187,8 @@ def table(summary, base=None):
 
 def compare(base_path, head_path):
     base, head = summarize(json.load(open(base_path))), summarize(json.load(open(head_path)))
-    regressions = [c for c in CONDITIONS if head[c]["success"] < base[c]["success"]]
+    regressions = [c for c in CONDITIONS if head[c]["success"] is not None and base[c]["success"] is not None
+                   and head[c]["success"] < base[c]["success"]]
     md = ["<!-- colorhide-benchmark -->", "## 📊 Codec benchmark", "",
           f"{len(IMAGES)} public-domain photos × {len(SEEDS)} seeds per condition, simulated print + scan. "
           "ΔE is CIEDE2000 colour error at cell resolution (lower is better); Detail compares with the photo at 2× "

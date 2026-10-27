@@ -47,21 +47,56 @@ def _ring_end(profile):
     return start + int(np.argmax(~ink[start:]))
 
 
-def _count_cells(profile, length):
-    """Count grid cells along a line through the timing track."""
+def _cell_size(profile):
+    """Cell size in px along a line through the timing track (alternating 1-cell runs).
+    Robust to pen strokes: runs of the wrong length are dropped and the size comes from a
+    least-squares fit of the remaining run centres, not from counting runs."""
     ink = profile > 0.5
     on = np.flatnonzero(ink)
-    if len(on) == 0:
-        raise ValueError("timing track not found")
+    if len(on) < 2:
+        return None
     ink = ink[on[0]:on[-1] + 1]  # the outermost pixels can sample paper just outside the frame
     edges = np.flatnonzero(np.diff(ink.astype(np.int8))) + 1
-    runs = np.split(np.arange(len(ink)), edges)
-    runs = runs[1:-1]  # drop the runs merged with the ring on both ends
-    if len(runs) < 4:
+    starts = np.concatenate([[0], edges])[1:-1]  # drop the runs merged with the ring on both ends
+    ends = np.concatenate([edges, [len(ink)]])[1:-1]
+    if len(starts) < 8:
+        return None
+    lengths = ends - starts
+    cell0 = float(np.median(lengths))
+    good = np.abs(lengths - cell0) < 0.35 * cell0
+    centres = ((starts + ends) / 2.0)[good]
+    if len(centres) < 8:
+        return None
+    k = np.concatenate([[0], np.cumsum(np.round(np.diff(centres) / cell0))])  # cell index of each run
+    for _ in range(2):  # fit, drop outliers, refit
+        cell, c0 = np.polyfit(k, centres, 1)
+        keep = np.abs(centres - (c0 + cell * k)) < 0.3 * cell
+        k, centres = k[keep], centres[keep]
+    return float(cell)
+
+
+def _grid_count(rough, axis, cell_px, length):
+    """Cells across the frame along `axis`, from several lines through the timing track."""
+    sizes = []
+    for f in (2.3, 2.5, 2.7):
+        i = int(round(f * cell_px))
+        size = _cell_size(rough[i, :] if axis == 1 else rough[:, i])
+        if size:
+            sizes.append(size)
+    if not sizes:
         raise ValueError("timing track not found")
-    span = runs[-1][-1] + 1 - runs[0][0]
-    cell = span / len(runs)
-    return int(round(length / cell))
+    return int(round(length / float(np.median(sizes))))
+
+
+def _find_quad(contour):
+    """Four rough corners of the frame. Pen strokes stuck to the frame make the outline ragged,
+    so simplify harder until a quadrilateral appears; the minimum-area box is the last resort."""
+    peri = cv2.arcLength(contour, True)
+    for eps in (0.02, 0.03, 0.05, 0.08):
+        quad = cv2.approxPolyDP(contour, eps * peri, True)
+        if len(quad) == 4:
+            return quad.reshape(4, 2).astype(np.float64)
+    return cv2.boxPoints(cv2.minAreaRect(contour)).astype(np.float64)
 
 
 def _refine_corners(contour, rough):
@@ -91,24 +126,35 @@ def _refine_corners(contour, rough):
     return np.array(corners, np.float32)
 
 
-def locate(gray, oversample=2):
-    """Find the page in a scan; return the image area resampled to exactly 1 px per printer dot,
-    as float darkness (0 = paper, 1 = ink), plus (h, w)."""
+class Frame:
+    """The page found in a scan: refined corners and the estimated grid size in cells."""
+
+    def __init__(self, src, W, H):
+        self.src, self.W, self.H = src, W, H
+
+    def candidates(self, radius=2):
+        """(W, H) to try, the estimate first, then its neighbours by distance."""
+        near = [(self.W + dw, self.H + dh) for dw in range(-radius, radius + 1) for dh in range(-radius, radius + 1)]
+        return sorted(near, key=lambda c: abs(c[0] - self.W) + abs(c[1] - self.H))
+
+
+def _box(W, H):
+    # pixel centres sit at integer coords, so the frame's outer edge is at -0.5
+    return np.array([[-0.5, -0.5], [W - 0.5, -0.5], [W - 0.5, H - 0.5], [-0.5, H - 0.5]], np.float32)
+
+
+def find_frame(gray):
     blur = cv2.GaussianBlur(gray, (0, 0), 1.0)
     _, bw = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     cnts, _ = cv2.findContours(bw, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    c = max(cnts, key=cv2.contourArea)
-    quad = cv2.approxPolyDP(c, 0.02 * cv2.arcLength(c, True), True)
-    if len(quad) != 4:
+    if not cnts:
         raise ValueError("page frame not found")
-    src = _refine_corners(c, _order(quad.reshape(4, 2).astype(np.float64)))
+    c = max(cnts, key=cv2.contourArea)
+    src = _refine_corners(c, _order(_find_quad(c)))
     wo = int(round(max(np.linalg.norm(src[1] - src[0]), np.linalg.norm(src[2] - src[3]))))
     ho = int(round(max(np.linalg.norm(src[3] - src[0]), np.linalg.norm(src[2] - src[1]))))
-    # pixel centres sit at integer coords, so the frame's outer edge is at -0.5
-    box = lambda W, H: np.array([[-0.5, -0.5], [W - 0.5, -0.5], [W - 0.5, H - 0.5], [-0.5, H - 0.5]], np.float32)
-    warped = cv2.warpPerspective(gray, cv2.getPerspectiveTransform(src, box(wo, ho)), (wo, ho),
+    warped = cv2.warpPerspective(gray, cv2.getPerspectiveTransform(src, _box(wo, ho)), (wo, ho),
                                  flags=cv2.INTER_LINEAR, borderValue=255).astype(np.float64)
-
     # rough levels for reading the timing track
     ink0 = np.median(warped[: max(1, ho // 400), :])
     paper0 = np.percentile(warped, 99)
@@ -116,13 +162,14 @@ def locate(gray, oversample=2):
     # ring thickness (2 cells); the timing track lengthens it on half the columns, so take a low percentile
     cols = np.linspace(wo * 0.2, wo * 0.8, 64).astype(int)
     cell_px = np.percentile([_ring_end(rough[:, x]) for x in cols], 10) / 2.0
-    row = rough[int(round(2.5 * cell_px)), :]
-    col = rough[:, int(round(2.5 * cell_px))]
-    W = _count_cells(row, wo)
-    H = _count_cells(col, ho)
+    return Frame(src, _grid_count(rough, 1, cell_px, wo), _grid_count(rough, 0, cell_px, ho))
 
+
+def sample(gray, frame, W, H, oversample=2):
+    """The image area resampled to exactly 1 px per printer dot for a W x H cell grid, as float
+    darkness (0 = paper, 1 = ink), plus (h, w)."""
     s = oversample
-    fine = cv2.warpPerspective(gray, cv2.getPerspectiveTransform(src, box(W * K * s, H * K * s)),
+    fine = cv2.warpPerspective(gray, cv2.getPerspectiveTransform(frame.src, _box(W * K * s, H * K * s)),
                                (W * K * s, H * K * s), flags=cv2.INTER_LINEAR, borderValue=255)
     grid = cv2.resize(fine.astype(np.float32), (W * K, H * K), interpolation=cv2.INTER_AREA).astype(np.float64)
     ink = np.median(grid[: 2 * K, 2 * K:-2 * K])
@@ -131,3 +178,10 @@ def locate(gray, oversample=2):
     dark = np.clip((paper - grid) / max(paper - ink, 1), 0, 1)
     h, w = H - 2 * B, W - 2 * B
     return dark[B * K:(B + h) * K, B * K:(B + w) * K], h, w
+
+
+def locate(gray, oversample=2):
+    """Find the page in a scan; return the image area at 1 px per printer dot, plus (h, w).
+    Uses the estimated grid size; codec.demodulate_full also tries neighbouring sizes."""
+    f = find_frame(gray)
+    return sample(gray, f, f.W, f.H, oversample)

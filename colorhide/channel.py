@@ -40,3 +40,38 @@ def print_scan(page, scale=2.0, rotate=1.5, persp=0.004, blur=0.7, dot_gain=0.15
     img = np.clip(img * 255, 0, 255).astype(np.uint8)
     ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, jpeg])
     return cv2.imdecode(buf, cv2.IMREAD_GRAYSCALE)
+
+
+def scribble(page, rng, inside=30, across=4, ink=25, width=6):
+    """Pen marks on a printed page (in printer dots): `inside` wobbly strokes over the image and
+    `across` strokes that cross the frame and timing track. ink 0 = black pen, ~120 = blue/pencil."""
+    from .halftone import K
+    from .layout import QUIET, B
+    out = page.copy()
+    off = QUIET * K
+    h, w = page.shape
+    img = (off + B * K, off + B * K, w - off - B * K, h - off - B * K)  # x0, y0, x1, y1
+
+    def stroke(x, y, dx, dy):
+        pts = [(x, y)]
+        for _ in range(12):
+            x += rng.integers(-dx, dx + 1)
+            y += rng.integers(-dy, dy + 1)
+            pts.append((x, y))
+        return np.array(pts, np.int32)
+
+    lines = [stroke(rng.integers(img[0] + 60, img[2] - 60), rng.integers(img[1] + 60, img[3] - 60), 40, 20)
+             for _ in range(inside)]
+    for i in range(across):  # start in the margin, run over the frame into the page
+        x = rng.integers(off, w - off)
+        y = rng.integers(off // 2, off + B * K) if i % 2 == 0 else rng.integers(h - off - B * K, h - off // 2)
+        lines.append(np.array([(x, y), (x + rng.integers(-200, 200), y + (300 if i % 2 == 0 else -300))], np.int32))
+    clip = np.zeros_like(page)  # strokes inside the image stay inside it
+    cv2.rectangle(clip, img[:2], (img[2] - 1, img[3] - 1), 255, -1)
+    for i, pts in enumerate(lines):
+        layer = np.full_like(page, 255)
+        cv2.polylines(layer, [pts], False, int(ink), width, cv2.LINE_AA)
+        if i < inside:
+            layer[clip == 0] = 255
+        out = np.minimum(out, layer)
+    return out

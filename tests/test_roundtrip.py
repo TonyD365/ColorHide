@@ -43,3 +43,13 @@ if __name__ == "__main__":
     test_roundtrip_classic()
     test_roundtrip_refiner()
     print("roundtrip OK")
+
+
+def test_pen_marks_on_image_and_frame():
+    """Handwriting over the photo and strokes across the frame / timing track still decode."""
+    rgb = _photo(300, 450)
+    page, _ = api.encode(rgb, width_in=4.0, dpi=600)
+    for seed in (0, 1):
+        marked = channel.scribble(page, np.random.default_rng(seed))
+        _, info = api.decode(channel.print_scan(marked, seed=seed), None)
+        assert info["rs_ok"]

@@ -38,16 +38,30 @@ def demodulate(gray):
     return dots, soft, h, w
 
 
-def demodulate_full(gray):
-    """Like demodulate(), plus the ink map at printer-dot resolution (h*K, w*K) for refiners that
-    read detail inside the cells."""
-    dark, h, w = layout.locate(gray)
+def _soft_bits(dark, h, w):
     n, sx, sy = halftone.measure(dark, h, w)
     # remove slowly varying centroid bias left by sub-dot misregistration
     sx = sx - cv2.GaussianBlur(sx, (0, 0), 6)
     sy = sy - cv2.GaussianBlur(sy, (0, 0), 6)
     soft = np.empty(h * w * 2)
     soft[0::2], soft[1::2] = sx.ravel(), sy.ravel()
+    return n, soft
+
+
+def demodulate_full(gray):
+    """Like demodulate(), plus the ink map at printer-dot resolution (h*K, w*K) for refiners that
+    read detail inside the cells. If the estimated grid size does not yield a valid header (a pen
+    stroke across the frame can fool the count), neighbouring sizes are tried."""
+    frame = layout.find_frame(gray)
+    first = None
+    for W, H in frame.candidates():
+        dark, h, w = layout.sample(gray, frame, W, H)
+        n, soft = _soft_bits(dark, h, w)
+        if first is None:
+            first = (dark, n, soft, h, w)
+        if payload.has_header(soft):
+            return dark, n / halftone.LEVELS, soft, h, w
+    dark, n, soft, h, w = first  # nothing verified: hand back the best guess, decoding reports the error
     return dark, n / halftone.LEVELS, soft, h, w
 
 
