@@ -1,5 +1,6 @@
 codec:
-  - changed-files: [{ any-glob-to-any-file: ["inkhue/*.py", "!inkhue/updater.py"] }]
+  # a file must match every glob: inside inkhue/ but not the updater
+  - changed-files: [{ all-globs-to-any-file: ["inkhue/*.py", "!inkhue/updater.py"] }]
 app:
   - changed-files: [{ any-glob-to-any-file: ["inkhue/gui/**", "packaging/**", "assets/**"] }]
 refiner:
