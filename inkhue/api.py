@@ -52,9 +52,23 @@ def encode(rgb_u8, width_in=6.0, dpi=600, factor=8, detail=True):
                       cells=(cells_w, cells_h), reps=info["reps"])
 
 
+class NoHiddenColor(ValueError):
+    """The scan carries no Inkhue data: not a page printed by Inkhue, or its frame is cut off or damaged."""
+
+
+NO_COLOR = ("No hidden color found on this page. Only pages made with Inkhue carry their color: load the "
+            "original in HIDE COLOR, print the black-and-white page it makes, then scan that at 1200 dpi. "
+            "If it is such a page, keep its whole black frame inside the scan and print it at 100 %.")
+
+
 def decode(gray_u8, refiner=None):
-    """Scanned page (uint8 gray) -> color image (h,w,3 uint8) and info."""
-    rgb, info = codec.decode(gray_u8, refiner=refiner)
+    """Scanned page (uint8 gray) -> color image (h,w,3 uint8) and info. Raises NoHiddenColor."""
+    try:
+        rgb, info = codec.decode(gray_u8, refiner=refiner)
+    except layout.ScanTooCoarse as ex:
+        raise NoHiddenColor(f"{NO_COLOR} (This scan looks like only about {ex.dpi} dpi.)") from ex
+    except (ValueError, cv2.error) as ex:
+        raise NoHiddenColor(NO_COLOR) from ex
     info = {k: (int(v) if isinstance(v, np.integer) else v) for k, v in info.items()}
     info["cells"] = tuple(int(x) for x in info["cells"])
     return (rgb * 255).round().astype(np.uint8), info

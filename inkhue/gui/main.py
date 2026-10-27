@@ -487,6 +487,10 @@ class Printer(QMainWindow):
         self.pool.start(job)
 
     def fail(self, msg):
+        if msg.startswith(api.NO_COLOR[:30]):
+            self.say("NO HIDDEN COLOR", "MAKE IT WITH HIDE COLOR FIRST", fault=True)
+            self.statusBar().showMessage(msg, 30000)
+            return
         self.say("ERROR", msg[:40], fault=True)
         self.statusBar().showMessage(msg, 15000)
 
@@ -536,7 +540,26 @@ class Printer(QMainWindow):
         panel.rejected.connect(lambda: self.say("PAGE READY", "PRINT CANCELLED"))
         panel.open()
 
-    def printed(self, printer, job):
+    def printed(self, printer, job, note=None):
+        kind = (note or {}).get("kind")
+        if kind == "release":
+            self.say("SENT TO PRINT SERVER", "RELEASE IT AT THE PRINTER")
+            self.statusBar().showMessage(f"{printer}: the job waits on the print server until you sign in at a "
+                                         "printer and release it.", 30000)
+            return
+        if kind == "auth":
+            self.say("SIGN IN TO PRINT", "JOB IS WAITING FOR YOU")
+            box = QMessageBox(self)
+            box.setWindowTitle("Sign in to print")
+            box.setText(f"{printer} needs you to sign in before it prints.\n"
+                        "Open the print queue and enter your account to release the job.")
+            open_q = box.addButton("Open Print Queue", QMessageBox.AcceptRole)
+            box.addButton("Later", QMessageBox.RejectRole)
+            box.exec()
+            if box.clickedButton() is open_q:
+                from .printing import open_queue
+                open_queue(note.get("queue"))
+            return
         self.say("PRINTING", f"{job} · {printer}"[:34])
         msg = f"Sent to {printer} ({job}). Scan it in grayscale at 1200 dpi to reveal the color."
         self.statusBar().showMessage(msg, 20000)
@@ -591,7 +614,10 @@ class Printer(QMainWindow):
             self.tray_out.eject(media.rgb_to_qimage(rgb), f"RECOVERED COLOR  ·  {rgb.shape[1]} × {rgb.shape[0]} PX"
                                 "  ·  DOUBLE-CLICK TO ZOOM")
             how = f"NEURAL {scale}X" if use_net and self.refiner else "CLASSIC"
-            self.say("COLOR RESTORED" if info["rs_ok"] else "COLOR (DAMAGED)", f"{how} · {info['reps']}X REDUNDANCY")
+            if info["rs_ok"]:
+                self.say("COLOR RESTORED", f"{how} · {info['reps']}X REDUNDANCY")
+            else:  # damaged parts stay gray instead of random colors
+                self.say("PARTLY RESTORED", f"{info['damaged']:.0%} LEFT GRAY · DAMAGED", fault=True)
             self.refresh_keys()
 
         self.run("DECODING", work, done=done)

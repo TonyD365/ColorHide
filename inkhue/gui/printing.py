@@ -143,7 +143,24 @@ class CupsBackend:
         if r.returncode != 0:
             raise RuntimeError(r.stderr.strip() or "lp failed")
         m = re.search(r"request id is (\S+)", r.stdout)
-        return m.group(1) if m else "submitted"
+        job = m.group(1) if m else "submitted"
+        return job, self.job_note(printer, job)
+
+    @staticmethod
+    def job_note(printer, job):
+        """Does the job need the user? Secure-print queues hold jobs for a sign-in or a release at the printer."""
+        import time
+        time.sleep(2.0)  # give CUPS a moment to talk to the printer / print server
+        try:
+            out = _run("lpstat", "-l", "-o", job).stdout.lower()
+            info = _run("lpoptions", "-p", printer).stdout.lower()
+        except PrinterUnreachable:
+            return None
+        if "authentication" in out or "auth-info-required" in out:
+            return {"kind": "auth", "queue": printer}
+        if any(k in info for k in ("pc-printer-discovery", "papercut", "release jobs", "secure print", "follow")):
+            return {"kind": "release", "queue": printer}
+        return None
 
 
 # ---- Qt (Windows) ------------------------------------------------------------
@@ -283,3 +300,19 @@ def open_pdf(page, dpi, s: SheetSettings, header=None):
     sheet.write_pdf(path, media.mono(page), dpi, page_size_for(s.paper) or QPageSize(QPageSize.Letter), s, header)
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
     return path
+
+
+def open_queue(printer):
+    """Show the system print queue for `printer`, where the OS asks for the sign-in."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDesktopServices
+    if sys.platform == "darwin":
+        app = Path.home() / "Library" / "Printers" / f"{printer}.app"
+        if app.exists():
+            subprocess.Popen(["open", str(app)])
+            return
+        QDesktopServices.openUrl(QUrl("x-apple.systempreferences:com.apple.Print-Scan-Settings.extension"))
+    elif sys.platform == "win32":
+        subprocess.Popen(["rundll32", "printui.dll,PrintUIEntry", "/o", "/n", printer])
+    else:
+        QDesktopServices.openUrl(QUrl("http://localhost:631/jobs/"))

@@ -403,7 +403,7 @@ class PrintPanel(QDialog):
             self.on_sent(name, jid)
             return
         job = Job(self.backend.submit, *args, quiet=True)
-        job.sig.done.connect(lambda jid: (self.accept(), self.on_sent(name, jid)))
+        job.sig.done.connect(lambda res: (self.accept(), self.on_sent(name, *res)))
         job.sig.failed.connect(lambda msg: (self.status.setText(f"⚠ {msg}"), self.go.setEnabled(True)))
         QThreadPool.globalInstance().start(job)
 
