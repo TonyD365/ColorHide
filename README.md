@@ -116,16 +116,91 @@ flowchart LR
     P --> S[Scan] --> D[Find frame, read cells,<br/>correct errors] --> N[Neural refiner] --> O[Color image, 2×]
 ```
 
-| Part | What it does |
-|---|---|
-| **Data halftone** | Every pixel becomes a 4×4 cell of printer dots (1/150 inch at 600 dpi). *How many* dots are inked sets the brightness; *which corner* the ink leans towards carries 2 bits. Dots are placed where the full-resolution image is darkest, so edges stay sharp. Mostly white pages keep at least one faint dot per cell, so blank paper carries data too. |
-| **Color payload** | Color at 1/8 resolution, 6 bits, Reed-Solomon protected and repeated across the page. A fixed public permutation spreads every byte over the sheet, so local damage never wipes out a region. |
-| **Frame** | A thin border finds the page and corrects tilt and perspective; a timing track, measured by its spectrum, gives the grid size even at 400 dpi. |
-| **Neural refiner** | A U-Net (~1 M parameters) trained on photos (DIV2K) and synthetic documents through a simulated printer and scanner. It reads the scan dot by dot and outputs color at 2× the cell resolution. |
+### 1. Cells and brightness
+
+A 600 dpi printer can only put a dot or leave paper white. Inkhue groups the dots into **cells of 4×4 dots**
+(1/150 inch). Each image pixel becomes one cell, and its brightness is the **number of inked dots**, 0 to 16 — the
+same idea as an ordinary halftone. Error diffusion spreads the rounding error to neighbouring cells so smooth
+gradients stay smooth.
+
+*Which* of the 16 positions get ink is chosen from the image at full printer resolution: dots go where the picture is
+darkest inside the cell, so edges and fine detail survive inside a cell instead of being averaged away.
+
+### 2. Two bits in every cell
+
+The arrangement also carries data. The **centre of mass of the ink** in a cell leans towards one of its four corners:
+left/right is one bit, top/bottom is another. The placement in step 1 is only allowed to choose arrangements whose
+centre of mass leans clearly enough (a safety margin) towards the corner the data asks for; the eye, seeing a 1/150-inch
+cell from reading distance, can't tell the difference.
+
+That is **2 bits per cell, about 45,000 bits (5.6 KB) per square inch** at 600 dpi — and the bits sit inside the
+picture, region by region, not in a separate code.
+
+### 3. Documents: blank paper must carry data too
+
+A cell with 0 dots (white paper) or 16 dots (solid black) has no corner to lean towards, so it can't carry bits. Photos
+have few such cells; a page of notes is mostly white. When more than 20 % of a page would be empty or full, Inkhue
+keeps **1 to 15 dots in every cell**: blank paper gets one faint dot per cell and carries data like everything else.
+A flag in the header tells the decoder to rescale brightness, so white comes back white.
+
+### 4. The color payload
+
+- The image is split into brightness (printed as the dots themselves) and color (Cb/Cr). People see brightness detail
+  far better than color detail — JPEG and TV rely on the same fact — so color is stored at **1/8 resolution**,
+  **6 bits** per value.
+- A small **header** (format version, color resolution, flags) is protected by Reed-Solomon and stored 48 times.
+- The color data is split into **Reed-Solomon** blocks (255 bytes, up to 16 wrong bytes corrected per block) and
+  **repeated** as many times as the page has room for — typically 9 copies.
+- Every bit is then placed by a **fixed, public permutation** across the whole page, and whitened, so that a smudge,
+  a fold or handwriting removes a little of every copy instead of all of one region, and so that repeated data never
+  forms a visible pattern. The permutation's seed is part of the format and never changes: nothing is secret.
+
+### 5. Frame and geometry
+
+The page is surrounded by a white margin, a **2-cell black frame**, a **timing track** of alternating black and white
+cells along the top and left, and a white gap.
+
+1. The frame is the largest dark outline in the scan; its four sides are fitted with robust line fits (pen strokes
+   touching it are ignored) and intersected for sub-pixel corners.
+2. The page is straightened with a perspective transform — tilt and keystone are corrected.
+3. The **grid size** comes from the timing track: its black/white alternation is a wave, and its period, measured from
+   the spectrum over the whole track, gives the cell size to about 0.1 % — precise enough at 400 dpi, where a cell is
+   only ~2.7 scan pixels.
+4. If the header doesn't check out, neighbouring grid sizes are tried, then the scan turned by 90°, 180° and 270°
+   (paper put in sideways or upside down). The header's Reed-Solomon check confirms the right one.
+5. The page is resampled (cubic interpolation) to exactly one pixel per printer dot.
+
+### 6. Reading the cells and correcting errors
+
+For every cell Inkhue measures the ink (→ brightness) and the ink's centre of mass (→ two *soft* bits: not just 0 or 1,
+but how confidently). Slow drifts from imperfect alignment are removed. All copies of each bit are added up, weighted
+by confidence, then Reed-Solomon corrects what's left. A block that is still too damaged leaves its part of the picture
+**gray** instead of filling it with random color.
+
+### 7. The neural refiner
+
+Decoded straight, the photo would be grainy and the color soft (1/8 resolution). A small **U-Net** (≈1 million
+parameters) reads the scan **dot by dot** together with the decoded color and outputs the photo at **2× the cell
+resolution** (300 ppi for a 600 dpi print). It learns to remove the halftone grain, undo toner spread, read the detail
+that step 1 put inside each cell, and sharpen the color along brightness edges. It was trained on the 800 DIV2K photos
+and synthetic documents (colored text, highlights, charts), printed and scanned through a simulator with random
+printer and scanner settings. It ships as a 4 MB ONNX model and runs on the CPU in about a second.
+
+### 8. Testing, and the limits
+
+The **simulator** reproduces toner spread, uneven coverage, paper noise, rotation, keystone, optical blur, tone curves,
+sensor noise and JPEG compression; the benchmark runs every change through it at several strengths.
+
+- **Scan resolution**: the data lives in single 1/600-inch dots. At 400 dpi a dot is ~0.7 scan pixels — the lowest
+  that works reliably; at 300 dpi the dots blur together. Scanning at 150–300 dpi (or with a phone) needs larger
+  cells — planned.
+- **Thin colored text** comes back paler than the original: an 8×8-cell color sample mixes the stroke with the
+  surrounding paper. A per-document color palette is planned.
+- **Scale**: printing at anything but 100 % resamples the dots, so the color usually won't decode.
 
 **How it differs from QR codes and watermarks:** those store a few bytes to a few kilobytes, either next to the image
-or as a faint signature inside it. Inkhue stores information **for every region of the picture** — about 5.6 KB of raw
-capacity per square inch at 600 dpi — while the page itself stays a clear photograph.
+or as a faint signature inside it. Inkhue stores information **for every region of the picture** while the page itself
+stays a clear photograph.
 
 ## Benchmark
 
