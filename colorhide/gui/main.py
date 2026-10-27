@@ -37,6 +37,7 @@ from .._version import __version__
 from . import media, scanner
 from .jobs import Job
 from .printpanel import PrintPanel
+from .viewer import Viewer
 
 ACCENT = "#ee6b33"
 
@@ -122,8 +123,12 @@ class Paper(QWidget):
         super().__init__()
         self.setFixedSize(w, h)
         self.pix, self.caption, self.placeholder, self.highlight = None, "", "", False
+        self.full, self.title = None, ""
 
-    def set_image(self, img: QImage | None, caption=""):
+    def set_image(self, img: QImage | None, caption="", title=""):
+        self.full, self.title = img, title or caption.title() or "Image"
+        self.setCursor(Qt.PointingHandCursor if img is not None else Qt.ArrowCursor)
+        self.setToolTip("Double-click to view at full resolution" if img is not None else "")
         if img is not None and img.width() > 2 * self.width():
             # area-average big pages down first; drawing a 600 dpi halftone straight to a thumbnail moirés
             img = img.convertToFormat(QImage.Format_Grayscale8 if img.isGrayscale() else QImage.Format_RGB32)
@@ -131,6 +136,10 @@ class Paper(QWidget):
         self.pix = QPixmap.fromImage(img) if img is not None else None
         self.caption = caption
         self.update()
+
+    def mouseDoubleClickEvent(self, _):
+        if self.full is not None:
+            Viewer(self.window(), self.full, self.title).show()
 
     def paintEvent(self, _):
         p = QPainter(self)
@@ -477,7 +486,7 @@ class Printer(QMainWindow):
             rgb, page, info = r
             self.page, self.page_dpi, self.color = page, dpi, None
             self.tray_in.paper.set_image(media.rgb_to_qimage(rgb))
-            self.tray_out.eject(media.gray_to_qimage(page), "HIDDEN-COLOR PAGE  ·  LOOKS LIKE PLAIN B/W")
+            self.tray_out.eject(media.gray_to_qimage(page), "HIDDEN-COLOR PAGE  ·  DOUBLE-CLICK TO SEE THE DOTS")
             self.say("PAGE READY", f"{info['width_in']:.2f} x {info['height_in']:.2f} IN @ {dpi} DPI")
             self.refresh_keys()
 
@@ -542,8 +551,10 @@ class Printer(QMainWindow):
         def done(r):
             rgb, info = r
             self.color = rgb
-            self.tray_out.eject(media.rgb_to_qimage(rgb), "RECOVERED COLOR")
-            how = "NEURAL" if use_net and self.refiner else "CLASSIC"
+            scale = round(rgb.shape[1] / info["cells"][0])
+            self.tray_out.eject(media.rgb_to_qimage(rgb), f"RECOVERED COLOR  ·  {rgb.shape[1]} × {rgb.shape[0]} PX"
+                                "  ·  DOUBLE-CLICK TO ZOOM")
+            how = f"NEURAL {scale}X" if use_net and self.refiner else "CLASSIC"
             self.say("COLOR RESTORED" if info["rs_ok"] else "COLOR (DAMAGED)", f"{how} · {info['reps']}X REDUNDANCY")
             self.refresh_keys()
 
