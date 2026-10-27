@@ -53,3 +53,46 @@ def test_pen_marks_on_image_and_frame():
         marked = channel.scribble(page, np.random.default_rng(seed))
         _, info = api.decode(channel.print_scan(marked, seed=seed), None)
         assert info["rs_ok"]
+
+
+def test_clear_errors_for_plain_pages_and_coarse_scans():
+    import cv2
+    import pytest
+    plain = np.full((1100, 850), 255, np.uint8)
+    cv2.rectangle(plain, (60, 60), (790, 1040), 0, 4)  # an ordinary document with a box on it
+    cv2.putText(plain, "Hello", (200, 400), cv2.FONT_HERSHEY_SIMPLEX, 3, 0, 6)
+    with pytest.raises(api.NoHiddenColor, match="No hidden color"):
+        api.decode(plain, None)
+    page, _ = api.encode(_photo(), width_in=2.5, dpi=600)
+    coarse = channel.print_scan(page, scale=0.3, seed=1)  # ~180 dpi
+    with pytest.raises(api.NoHiddenColor, match="about 1[0-9]{2} dpi"):
+        api.decode(coarse, None)
+
+
+def test_mostly_white_document_decodes():
+    """A text document is mostly white paper; every cell must still carry data (1..15 dots)."""
+    import cv2
+    doc = np.full((600, 450, 3), 255, np.uint8)
+    for i in range(12):
+        cv2.putText(doc, "The parts of a paragraph", (20, 40 + 45 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (20, 20, 20), 2)
+    cv2.rectangle(doc, (20, 300), (200, 330), (120, 230, 120), -1)  # a highlighter mark
+    page, _ = api.encode(doc, width_in=3.5, dpi=600)
+    out, info = api.decode(channel.print_scan(page, seed=2), None)
+    assert info["rs_ok"]
+    assert out[5:40, 300:440].mean() > 235  # white paper comes back white, not tinted gray
+
+
+def test_upside_down_and_sideways_scans():
+    page, _ = api.encode(_photo(), width_in=2.5, dpi=600)
+    scan = channel.print_scan(page, seed=3)
+    for turns in (1, 2, 3):
+        _, info = api.decode(np.ascontiguousarray(np.rot90(scan, turns)), None)
+        assert info["rs_ok"], turns
+
+
+def test_photos_keep_full_contrast_documents_get_ink_floor():
+    from inkhue import codec
+    _, info = codec.encode(_photo() / 255.0, factor=8)
+    assert not info["ink_floor"]
+    _, info = codec.encode(np.ones((200, 300, 3)), factor=8)
+    assert info["ink_floor"]

@@ -132,9 +132,51 @@ def gallery(height=230):
                                                                                          optimize=True)
 
 
+def document_demo(height=520):
+    """assets/document.png: a mostly white page of notes (text, highlighter, chart), printed and recovered."""
+    W, H = 1275, 1650  # US Letter at 150 dpi
+    img = Image.new("RGB", (W, H), "white")
+    d = ImageDraw.Draw(img)
+    big, mid, small = font(64), font(34), font(28)
+    d.text((90, 90), "Field trip notes", font=big, fill=(232, 98, 40))
+    d.text((92, 175), "Thursday · Science museum", font=small, fill=(120, 120, 130))
+    lines = ["Meet at the main entrance at 9:00.", "Bring a notebook and a pencil.",
+             "Lunch is at the café on the second floor.", "We will visit the color and light exhibit.",
+             "Write down three things that surprised you.", "Bus leaves at 3:30 — don't be late!"]
+    y = 270
+    for i, t in enumerate(lines):
+        if i == 3:
+            d.rectangle((84, y - 4, 92 + d.textlength(t, font=mid), y + 42), fill=(255, 236, 110))
+        d.text((90, y), t, font=mid, fill=(40, 40, 45) if i != 5 else (200, 40, 40))
+        y += 62
+    d.text((90, y + 20), "learn more: museum.example/kids", font=mid, fill=(30, 90, 210))
+    d.text((90, 760), "Votes for the next trip", font=mid, fill=(40, 40, 45))
+    for i, (v, c, n) in enumerate(((210, (231, 76, 60), "Zoo"), (320, (46, 160, 90), "Park"),
+                                   (150, (52, 120, 220), "Aquarium"), (260, (243, 166, 35), "Space center"))):
+        x = 110 + i * 270
+        d.rectangle((x, 1160 - v, x + 170, 1160), fill=c)
+        d.text((x, 1180), n, font=small, fill=(60, 60, 70))
+    d.ellipse((900, 1300, 1150, 1550), fill=(52, 120, 220))
+    d.pieslice((900, 1300, 1150, 1550), -90, 40, fill=(243, 166, 35))
+    d.pieslice((900, 1300, 1150, 1550), 40, 140, fill=(46, 160, 90))
+    d.text((90, 1400), "Signed: Ms. Rivera", font=mid, fill=(30, 30, 35))
+    rgb = np.asarray(img)
+    page, info = api.encode(rgb, width_in=6.0, dpi=600)
+    out, dinfo = api.decode(channel.print_scan(page, seed=7), api.load_refiner())
+    assert dinfo["rs_ok"]
+    ys, xs = np.where(page < 128)
+    bw = cv2.cvtColor(page[ys.min():ys.max() + 1, xs.min():xs.max() + 1], cv2.COLOR_GRAY2RGB)
+    fit = lambda a: cv2.resize(a, (round(a.shape[1] * height / a.shape[0]), height), interpolation=cv2.INTER_AREA)
+    gap = np.full((height, 24, 3), 24, np.uint8)
+    strip = np.hstack([fit(rgb), gap, fit(bw), gap, fit(out)])
+    Image.fromarray(np.pad(strip, ((24, 24), (24, 24), (0, 0)), constant_values=24)).save(ASSETS / "document.png",
+                                                                                          optimize=True)
+
+
 if __name__ == "__main__":
     compare()
     reveal_gif()
     gallery()
+    document_demo()
     screenshot()
     print("wrote assets/compare.png, reveal.gif, gallery.png, screenshot.png")

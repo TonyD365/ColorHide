@@ -48,6 +48,7 @@ def scan(parent, on_done, on_error):
 def _scan_macos(on_done, on_error):
     from AppKit import (
         NSBackingStoreBuffered,
+        NSColor,
         NSMakeRect,
         NSPanel,
         NSTextField,
@@ -70,7 +71,18 @@ def _scan_macos(on_done, on_error):
     class Delegate(NSObject):
         def deviceBrowserView_selectionDidChange_(self, browser, device):
             from ImageCaptureCore import ICScannerDevice
-            self.scanner.setScannerDevice_(device if isinstance(device, ICScannerDevice) else None)
+            scanner = device if isinstance(device, ICScannerDevice) else None
+            self.scanner.setScannerDevice_(scanner)
+            self.tip.setStringValue_(TIP)
+            if scanner is not None:  # an empty panel means the session never opened: say why, don't stay blank
+                self.performSelector_withObject_afterDelay_("checkSession:", scanner, 12.0)
+
+        def checkSession_(self, device):
+            if self.scanner.scannerDevice() is device and not device.hasOpenSession():
+                self.tip.setStringValue_(
+                    f"Couldn't connect to {device.name()}. It may be asleep, busy (close HP Smart, Image Capture "
+                    "or other scanning apps) or on another network. Wake it up, then select it again.")
+                self.tip.setTextColor_(NSColor.systemRedColor())
 
         def deviceBrowserView_didEncounterError_(self, browser, error):
             on_error(str(error.localizedDescription()))
@@ -116,7 +128,7 @@ def _scan_macos(on_done, on_error):
     panel.setContentView_(content)
 
     d = Delegate.alloc().init()
-    d.scanner, d.panel = view, panel
+    d.scanner, d.panel, d.tip = view, panel, tip
     browser.setDelegate_(d)
     view.setDelegate_(d)
     _keep[:] = [panel, d, browser, view]

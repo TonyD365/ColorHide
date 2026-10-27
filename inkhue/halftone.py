@@ -60,9 +60,18 @@ def error_diffuse(target, lo, hi):
     return out
 
 
-def luma_to_levels(y):
-    """Y in [0,1] -> ink dot count per cell."""
+def luma_to_levels(y, floor=True):
+    """Y in [0,1] -> ink dot count per cell. With `floor`, every cell keeps 1..LEVELS-1 dots: an empty
+    (white) or full (black) cell has no corner to lean towards, so it could not carry its 2 bits —
+    a mostly white document would then lose most of its data. White paper prints as a 1/16 tint."""
+    if floor:
+        return error_diffuse((1.0 + (1.0 - y) * (LEVELS - 2)).astype(np.float64), 1, LEVELS - 1)
     return error_diffuse(((1.0 - y) * LEVELS).astype(np.float64), 0, LEVELS)
+
+
+def floor_to_luma(y):
+    """Undo the 1..LEVELS-1 range on a luma estimate made as if 0..LEVELS were used."""
+    return np.clip(1.0 - (LEVELS * (1.0 - y) - 1.0) / (LEVELS - 2), 0.0, 1.0)
 
 
 def render(levels, corners):

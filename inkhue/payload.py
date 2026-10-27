@@ -21,6 +21,8 @@ MAGIC = b"CH"
 VERSION = 1
 SEED = 20261027  # DO NOT MODIFY / 禁止修改
 HDR_NSYM = 8
+# header byte 5 holds flags (always 0 before Inkhue 1.2, so old pages read as "no flags")
+FLAG_INK_FLOOR = 1  # every cell has 1..15 dots: the decoder rescales brightness
 HDR_REPS = 48
 BODY_NSYM = 32
 
@@ -66,9 +68,9 @@ def _hdr_bits():
     return 8 * (6 + HDR_NSYM)
 
 
-def encode_bits(q, factor, qbits, capacity):
+def encode_bits(q, factor, qbits, capacity, flags=0):
     """Return a length-`capacity` 0/1 array laid out in cell-bit order."""
-    hdr = MAGIC + bytes([VERSION, factor, qbits, 0])
+    hdr = MAGIC + bytes([VERSION, factor, qbits, flags])
     hb = _bits(_hdr_rs.encode(hdr))
     bb = _bits(_body_rs.encode(_pack(q, qbits)))
     nh = len(hb) * HDR_REPS
@@ -95,7 +97,7 @@ def _header(s, nh):
         return None
     if hdr[:2] != MAGIC or hdr[2] != VERSION:
         return None
-    return hdr[3], hdr[4]
+    return hdr[3], hdr[4], hdr[5]
 
 
 def has_header(soft):
@@ -117,7 +119,7 @@ def decode_soft(soft, h, w):
     hdr = _header(s, nh)
     if hdr is None:
         raise ValueError("no Inkhue header found")
-    factor, qbits = hdr
+    factor, qbits, flags = hdr
     ch, cw = chroma_shape(h, w, factor)
     count = ch * cw * 2
     nbytes = -(-count * qbits // 8)
@@ -125,15 +127,25 @@ def decode_soft(soft, h, w):
     reps = (capacity - nh) // nbody
     body_soft = s[nh:nh + reps * nbody].reshape(reps, nbody).sum(0)
     raw = np.packbits(body_soft > 0).tobytes()
-    try:
-        data, _, errata = _body_rs.decode(raw)
-        nfixed = len(errata)
-        ok = True
-    except ReedSolomonError:
-        # fall back to the uncorrected bits: a few wrong chroma samples beats no color at all
-        k = 255 - BODY_NSYM
-        data = b"".join(raw[blk:min(blk + k, len(raw))] for blk in range(0, len(raw), 255))
-        nfixed, ok = -1, False
-    q = _unpack(bytes(data), count, qbits).reshape(2, ch, cw)
-    info = dict(factor=factor, qbits=qbits, reps=reps, rs_ok=ok, rs_fixed=nfixed)
+    # Reed-Solomon block by block: a block that can't be corrected leaves its samples neutral (no color
+    # there) instead of filling the photo with random colors
+    k = 255 - BODY_NSYM
+    data, bad, nfixed = bytearray(), [], 0
+    for i, start in enumerate(range(0, len(raw), 255)):
+        chunk = raw[start:start + 255]
+        try:
+            msg, _, errata = _body_rs.decode(chunk)
+            data += msg
+            nfixed += len(errata)
+        except ReedSolomonError:
+            data += chunk[:max(0, len(chunk) - BODY_NSYM)]
+            bad.append(i)
+    q = _unpack(bytes(data), count, qbits)
+    for i in bad:  # bytes [i*k, (i+1)*k) -> the samples whose bits fall inside
+        lo, hi = i * k * 8 // qbits, min(count, -(-(i + 1) * k * 8 // qbits))
+        q[lo:hi] = round(0.5 * ((1 << qbits) - 1))
+    q = q.reshape(2, ch, cw)
+    nblocks = -(-len(raw) // 255)
+    info = dict(factor=factor, qbits=qbits, flags=flags, reps=reps, rs_ok=not bad, rs_fixed=nfixed,
+                damaged=len(bad) / nblocks)
     return dequantize(q, qbits).transpose(1, 2, 0), info

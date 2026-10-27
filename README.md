@@ -41,6 +41,12 @@ can read the color back out. No secret key, nothing encrypted — the format is 
 the color still comes back, and the handwriting stays, just as it is on the paper. Photos: public domain / CC0
 (NASA, scikit-image).</sub>
 
+### Documents too
+
+<div align="center"><img src="assets/document.png" alt="A page of notes with a highlighter mark and a colored chart, printed in black and white and recovered in color"></div>
+
+<sub>Mostly white pages — notes, worksheets, slides — keep their highlights, colored text and charts.</sub>
+
 ## Features
 
 - 🖨️ **Printer-style desktop app** for macOS, Windows and Linux
@@ -100,7 +106,7 @@ flowchart LR
 
 | Layer | What it does |
 |---|---|
-| **Data halftone** | Every pixel becomes a 4×4 cell of printer dots (1/150 inch at 600 dpi). *How many* dots are inked sets the gray level; *which corner* the ink leans towards carries 2 bits. Inside each cell the dots are placed where the full-resolution photo is darkest, so edges stay sharp, while the ink's centre of mass still leans clearly enough towards the data corner. The eye only sees gray. |
+| **Data halftone** | Every pixel becomes a 4×4 cell of printer dots (1/150 inch at 600 dpi). *How many* dots are inked sets the gray level; *which corner* the ink leans towards carries 2 bits. Pages that are mostly white paper (documents) keep at least one dot in every cell, so blank areas carry data too. Inside each cell the dots are placed where the full-resolution photo is darkest, so edges stay sharp, while the ink's centre of mass still leans clearly enough towards the data corner. The eye only sees gray. |
 | **Color payload** | Cb/Cr at 1/8 resolution, 6-bit, protected by Reed-Solomon and repeated across the page. A fixed, public permutation spreads every byte over the whole sheet so local damage never destroys a region. |
 | **Neural refiner** | A small U-Net (≈1 M parameters) trained on [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/) through a simulated print/scan channel. It reads the scan dot by dot — including the detail the halftone placed inside each cell — and outputs color at **2× the cell resolution** (300 ppi for a 600 dpi print), removing grain, correcting toner spread and sharpening the color along luminance edges. |
 | **Frame** | A thin border to find the page in a scan and a timing track to count the grid. |

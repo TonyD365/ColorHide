@@ -28,8 +28,24 @@ try:
 except ImportError:  # CI runs this script against the base branch too, which may predate the rename
     from colorhide import api, channel, codec, halftone, layout, payload
 
-# scikit-image sample photos: public domain / CC0
-IMAGES = ["astronaut", "coffee", "chelsea", "rocket"]
+# scikit-image sample photos (public domain / CC0), plus a mostly white text document
+IMAGES = ["astronaut", "coffee", "chelsea", "rocket", "document"]
+
+
+def sample_document(w=850, h=1100):
+    """A page of notes: white paper, black text, a colored title, a highlighter mark, a colored chart."""
+    doc = np.full((h, w, 3), 255, np.uint8)
+    cv2.putText(doc, "Meeting notes", (60, 110), cv2.FONT_HERSHEY_DUPLEX, 2.0, (230, 100, 40), 3)
+    for i in range(14):
+        y = 190 + 40 * i
+        cv2.putText(doc, "The quick brown fox jumps over the lazy dog.", (60, y), cv2.FONT_HERSHEY_SIMPLEX, 0.85,
+                    (30, 30, 30) if i % 5 else (40, 70, 200), 2)
+    cv2.rectangle(doc, (55, 395), (520, 425), (255, 240, 120), -1)  # highlighter, under the text
+    cv2.putText(doc, "Remember to bring the color samples!", (60, 420), cv2.FONT_HERSHEY_SIMPLEX, 0.85, (30, 30, 30), 2)
+    for i, (hgt, col) in enumerate(((180, (220, 60, 60)), (260, (60, 160, 90)), (120, (60, 110, 220)),
+                                    (220, (240, 170, 40)))):
+        cv2.rectangle(doc, (90 + i * 150, 1040 - hgt), (190 + i * 150, 1040), col, -1)
+    return doc
 SEEDS = [1, 2, 3]
 WIDTH_IN = 3.0
 CONDITIONS = {
@@ -69,7 +85,7 @@ def run():
     refiner = api.load_refiner()
     rows = []
     for name in IMAGES:
-        rgb = getattr(skdata, name)()
+        rgb = sample_document() if name == "document" else getattr(skdata, name)()
         t = time.perf_counter()
         page, info = api.encode(rgb, width_in=WIDTH_IN, dpi=600)
         t_enc = time.perf_counter() - t

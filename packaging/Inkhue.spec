@@ -39,5 +39,9 @@ if sys.platform == "darwin":
             "CFBundleVersion": VERSION,
             "LSMinimumSystemVersion": "12.0",
             "NSHighResolutionCapable": True,
+            # network printers and scanners (AirPrint / AirScan) are local-network devices
+            "NSLocalNetworkUsageDescription": "Inkhue finds and uses printers and scanners on your network.",
+            "NSBonjourServices": ["_ipp._tcp", "_ipps._tcp", "_uscan._tcp", "_uscans._tcp", "_scanner._tcp",
+                                  "_pdl-datastream._tcp", "_printer._tcp"],
         },
     )
