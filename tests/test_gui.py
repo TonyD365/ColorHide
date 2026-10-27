@@ -35,6 +35,7 @@ def test_app_cycle(tmp_path):
 
     w = Printer()
     w.show()
+    w.fill.setChecked(False)  # a small page keeps the test fast; "fill the paper" would print it Letter-sized
     w.width_in.setValue(2.5)
     w.feed(str(photo))
     _wait(app, lambda: w.page is not None and not w.busy)
