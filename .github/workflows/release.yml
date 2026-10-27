@@ -8,9 +8,9 @@ name: Release builds
 on:
   release:
     types: [published]
-  # pull requests that touch packaging build, install and self-test every installer too (nothing is published)
-  pull_request:
-    paths: [packaging/**, .github/workflows/release.yml, colorhide/updater.py]
+  # CI calls this for pull requests that touch packaging: build, install and self-test every
+  # installer, publish nothing (see the "Installers" job in ci.yml)
+  workflow_call:
   workflow_dispatch:
     inputs:
       tag:
