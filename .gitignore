@@ -1,0 +1,8 @@
+.venv/
+data/
+out/
+__pycache__/
+*.npz
+app/.build/
+app/*.app
+.DS_Store

@@ -1,0 +1,11 @@
+# Everything for development: the app plus training and the demo scripts.
+-r requirements-app.txt
+pillow
+scipy
+scikit-image
+numba
+torch
+onnx
+onnxscript
+pyinstaller
+pytest

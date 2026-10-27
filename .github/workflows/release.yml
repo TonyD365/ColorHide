@@ -1,0 +1,150 @@
+# Builds the desktop app for every platform when a GitHub Release is published and attaches
+# the archives to that release. The release tag (e.g. v1.0.0) becomes the app version.
+# Installed apps update themselves from whichever release is marked "Latest".
+name: Release builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to (re)build, e.g. v1.0.0
+        required: true
+
+permissions:
+  contents: write       # upload release assets
+  id-token: write       # build provenance attestation
+  attestations: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  PYTHON: "3.12"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON }}
+      - run: pip install numpy opencv-python-headless reedsolo onnxruntime pytest
+      - run: pytest -q tests
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, key: windows-x64 }
+          - { os: ubuntu-22.04, key: linux-x64 }
+          - { os: macos-15, key: macos-arm64 }
+          - { os: macos-15-intel, key: macos-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON }}
+
+      - name: Stamp version from tag
+        run: echo "__version__ = \"${TAG#v}\"  # set by CI from the release tag" > colorhide/_version.py
+
+      - name: Linux Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-shape0 libxcb-xinerama0
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-app.txt pyinstaller
+
+      - name: Build
+        run: pyinstaller packaging/ColorHide.spec --noconfirm
+
+      - name: Self-test the packaged app (encode, simulated print+scan, neural decode)
+        run: |
+          case "$RUNNER_OS" in
+            macOS)   APP=dist/ColorHide.app/Contents/MacOS/ColorHide ;;
+            Windows) APP=dist/ColorHide/ColorHide.exe ;;
+            *)       APP=dist/ColorHide/ColorHide ;;
+          esac
+          "$APP" --self-test && echo "self-test passed"
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          # free ad-hoc signature (no Apple Developer account); users approve once in
+          # System Settings > Privacy & Security > Open Anyway
+          codesign --force --deep --sign - dist/ColorHide.app
+          ditto -c -k --keepParent dist/ColorHide.app "ColorHide-$TAG-${{ matrix.key }}.zip"
+          echo "ASSET=ColorHide-$TAG-${{ matrix.key }}.zip" >> "$GITHUB_ENV"
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          tar -czf "ColorHide-$TAG-${{ matrix.key }}.tar.gz" -C dist ColorHide
+          echo "ASSET=ColorHide-$TAG-${{ matrix.key }}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          7z a -tzip "ColorHide-$TAG-${{ matrix.key }}.zip" ./dist/ColorHide
+          echo "ASSET=ColorHide-$TAG-${{ matrix.key }}.zip" >> "$GITHUB_ENV"
+
+      # Optional free Windows code signing through SignPath Foundation (open-source projects).
+      # Runs only once the SIGNPATH_API_TOKEN secret and SIGNPATH_ORGANIZATION_ID variable are set.
+      - name: Upload unsigned Windows build for signing
+        id: unsigned
+        if: runner.os == 'Windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-windows
+          path: ${{ env.ASSET }}
+      - name: Sign with SignPath
+        if: runner.os == 'Windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ColorHide
+          signing-policy-slug: release-signing
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: Use signed Windows build
+        if: runner.os == 'Windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        run: mv -f "signed/$ASSET" "$ASSET"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ env.ASSET }}
+
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "$ASSET" --clobber --repo "${{ github.repository }}"
+
+  checksums:
+    # uploaded last on purpose: the in-app updater only offers a release once this file exists
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --repo "${{ github.repository }}" --pattern 'ColorHide-*' --dir dl
+          cd dl && sha256sum ColorHide-* > ../SHA256SUMS.txt && cd ..
+          cat SHA256SUMS.txt
+          gh release upload "$TAG" SHA256SUMS.txt --clobber --repo "${{ github.repository }}"

@@ -1,0 +1,11 @@
+# What the desktop app needs at runtime (and what the release builds bundle).
+numpy
+opencv-python-headless
+reedsolo
+certifi
+onnxruntime
+PySide6-Essentials
+PySide6-Pdf
+pyobjc-framework-Quartz; sys_platform == "darwin"
+pyobjc-framework-ImageCaptureCore; sys_platform == "darwin"
+pywin32; sys_platform == "win32"
