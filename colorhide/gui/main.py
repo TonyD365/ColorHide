@@ -585,8 +585,9 @@ class Printer(QMainWindow):
         self.statusBar().showMessage(f"ColorHide {info['tag']} is ready; it installs when you quit.")
         box = QMessageBox(self)
         box.setWindowTitle("Update ready")
+        extra = "\nYou'll be asked for your password to install it." if sys.platform.startswith("linux") else ""
         box.setText(f"ColorHide {info['tag']} has been downloaded and verified.\n"
-                    f"You have v{__version__}.")
+                    f"You have v{__version__}.{extra}")
         box.setDetailedText(info["notes"] or "")
         now = box.addButton("Restart Now", QMessageBox.AcceptRole)
         box.addButton("Install When I Quit", QMessageBox.RejectRole)

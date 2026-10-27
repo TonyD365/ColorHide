@@ -26,16 +26,24 @@
 - 💾 还原后的彩色图可导出为 PDF、PNG、JPEG、TIFF、WebP、HEIC 等格式
 - 🧠 可选的神经网络精修（ONNX，CPU 即可运行）
 - 🛡️ Reed-Solomon 纠错码加冗余，扛得住污渍、歪斜和扫描噪声
-- 🔄 自动更新到最新的 Release，并校验 SHA-256
+- 📦 真正的安装包：Mac `.pkg`（装进「应用程序」）、Windows 安装程序、Linux `.deb`
+- 🔄 自动更新到最新的 Release（使用同样的安装包），并校验 SHA-256
 
-## 首次打开
+## 安装
 
-**macOS**：解压后把 `ColorHide.app` 拖进「应用程序」并打开。第一次会被系统拦截，
-到「系统设置 → 隐私与安全性」，往下找到「仍要打开」并点击。只需要一次，之后的更新不会再拦。
+从 [Releases](https://github.com/TonyD365/ColorHide/releases/latest) 下载对应系统的安装包：
 
-**Windows**：解压后运行 `ColorHide.exe`。如果出现 SmartScreen 提示，点「更多信息 → 仍要运行」。
+| 系统 | 安装包 | 安装位置 |
+|---|---|---|
+| macOS（Apple 芯片 / Intel） | `ColorHide-版本-macos-arm64.pkg` / `-macos-x64.pkg` | 「应用程序」文件夹 |
+| Windows 10/11 | `ColorHide-版本-windows-x64-setup.exe` | 当前用户的程序目录（也可选所有用户），带开始菜单和卸载程序 |
+| Ubuntu / Debian | `ColorHide-版本-linux-x64.deb` | `/opt/ColorHide`，带应用菜单图标 |
 
-**Linux**：`tar xzf ColorHide-*.tar.gz && ./ColorHide/ColorHide`。扫描功能需要安装 SANE（`sudo apt install sane-utils`）。
+**macOS**：打开 `.pkg`，第一次会被系统拦截。到「系统设置 → 隐私与安全性」往下找到「仍要打开」，然后按安装器提示完成，应用会装进「应用程序」。只需要一次，之后的自动更新不用输密码。
+
+**Windows**：运行 `setup.exe`。如果出现 SmartScreen 提示，点「更多信息 → 仍要运行」。
+
+**Ubuntu / Debian**：`sudo apt install ./ColorHide-*.deb`，或直接双击安装。扫描功能需要 `sudo apt install sane-utils`；自动更新时会请你输入密码。
 
 ## 打印和扫描建议
 

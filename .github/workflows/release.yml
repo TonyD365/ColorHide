@@ -1,11 +1,16 @@
-# Builds the desktop app for every platform when a GitHub Release is published and attaches
-# the archives to that release. The release tag (e.g. v1.0.0) becomes the app version.
-# Installed apps update themselves from whichever release is marked "Latest".
+# Builds the desktop app for every platform when a GitHub Release is published and attaches the
+# installers to that release: macOS .pkg (-> /Applications), Windows setup.exe, Linux .deb.
+# Each installer is installed on the runner and the installed app self-tests before upload.
+# The release tag (e.g. v1.0.0) becomes the app version. Installed apps update themselves from
+# whichever release is marked "Latest", using these same installers.
 name: Release builds
 
 on:
   release:
     types: [published]
+  # pull requests that touch packaging build, install and self-test every installer too (nothing is published)
+  pull_request:
+    paths: [packaging/**, .github/workflows/release.yml, colorhide/updater.py]
   workflow_dispatch:
     inputs:
       tag:
@@ -18,7 +23,8 @@ permissions:
   attestations: write
 
 env:
-  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  TAG: ${{ github.event.release.tag_name || inputs.tag || format('v0.0.0-pr{0}', github.event.number) }}
+  PUBLISH: ${{ github.event_name != 'pull_request' }}
   PYTHON: "3.12"
 
 jobs:
@@ -27,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || env.TAG }}
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON }}
@@ -51,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ env.TAG }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || env.TAG }}
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON }}
@@ -82,26 +88,26 @@ jobs:
           esac
           "$APP" --self-test && echo "self-test passed"
 
-      - name: Package (macOS)
+      - name: Installer (macOS .pkg -> /Applications)
         if: runner.os == 'macOS'
         run: |
-          # free ad-hoc signature (no Apple Developer account); users approve once in
+          # free ad-hoc signature (no Apple Developer account); users approve the installer once in
           # System Settings > Privacy & Security > Open Anyway
           codesign --force --deep --sign - dist/ColorHide.app
-          ditto -c -k --keepParent dist/ColorHide.app "ColorHide-$TAG-${{ matrix.key }}.zip"
-          echo "ASSET=ColorHide-$TAG-${{ matrix.key }}.zip" >> "$GITHUB_ENV"
+          KEY="${{ matrix.key }}"
+          echo "ASSET=$(packaging/macos/build_pkg.sh "$TAG" "${KEY#macos-}" | tail -1)" >> "$GITHUB_ENV"
 
-      - name: Package (Linux)
+      - name: Installer (Linux .deb -> /opt/ColorHide)
         if: runner.os == 'Linux'
-        run: |
-          tar -czf "ColorHide-$TAG-${{ matrix.key }}.tar.gz" -C dist ColorHide
-          echo "ASSET=ColorHide-$TAG-${{ matrix.key }}.tar.gz" >> "$GITHUB_ENV"
+        run: echo "ASSET=$(packaging/linux/build_deb.sh "$TAG" | tail -1)" >> "$GITHUB_ENV"
 
-      - name: Package (Windows)
+      - name: Installer (Windows setup.exe, Inno Setup)
         if: runner.os == 'Windows'
         run: |
-          7z a -tzip "ColorHide-$TAG-${{ matrix.key }}.zip" ./dist/ColorHide
-          echo "ASSET=ColorHide-$TAG-${{ matrix.key }}.zip" >> "$GITHUB_ENV"
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          [ -x "$ISCC" ] || choco install innosetup -y --no-progress
+          "$ISCC" //Q "//DAppVersion=${TAG#v}" "//DTag=$TAG" packaging/windows/ColorHide.iss
+          echo "ASSET=ColorHide-$TAG-windows-x64-setup.exe" >> "$GITHUB_ENV"
 
       # Optional free Windows code signing through SignPath Foundation (open-source projects).
       # Runs only once the SIGNPATH_API_TOKEN secret and SIGNPATH_ORGANIZATION_ID variable are set.
@@ -127,12 +133,46 @@ jobs:
         if: runner.os == 'Windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
         run: mv -f "signed/$ASSET" "$ASSET"
 
+      - name: Install it for real, then self-test the installed app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          sudo installer -pkg "$ASSET" -target /
+          /Applications/ColorHide.app/Contents/MacOS/ColorHide --self-test && echo "installed app OK"
+
+      - name: Install it for real, then self-test the installed app (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y "./$ASSET"
+          test -f /usr/share/applications/colorhide.desktop
+          /opt/ColorHide/ColorHide --self-test && echo "installed app OK"
+
+      - name: Install it for real, then self-test the installed app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath ".\$env:ASSET" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\ColorHide\ColorHide.exe"
+          $t = Start-Process -FilePath $exe -ArgumentList '--self-test' -Wait -PassThru
+          if ($t.ExitCode -ne 0) { throw "installed app self-test failed ($($t.ExitCode))" }
+          "installed app OK"
+
+      - name: Keep the installer as a workflow artifact (pull requests)
+        if: env.PUBLISH != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET }}
+          path: ${{ env.ASSET }}
+          retention-days: 7
+
       - name: Attest build provenance
+        if: env.PUBLISH == 'true'
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: ${{ env.ASSET }}
 
       - name: Upload to release
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" "$ASSET" --clobber --repo "${{ github.repository }}"
@@ -140,6 +180,7 @@ jobs:
   checksums:
     # uploaded last on purpose: the in-app updater only offers a release once this file exists
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: SHA256SUMS.txt

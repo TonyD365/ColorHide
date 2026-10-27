@@ -6,3 +6,8 @@ __pycache__/
 app/.build/
 app/*.app
 .DS_Store
+dist/
+build/
+*.pkg
+*.deb
+*-setup.exe
