@@ -95,11 +95,14 @@ jobs:
           # System Settings > Privacy & Security > Open Anyway
           codesign --force --deep --sign - dist/ColorHide.app
           KEY="${{ matrix.key }}"
-          echo "ASSET=$(packaging/macos/build_pkg.sh "$TAG" "${KEY#macos-}" | tail -1)" >> "$GITHUB_ENV"
+          packaging/macos/build_pkg.sh "$TAG" "${KEY#macos-}"
+          echo "ASSET=ColorHide-$TAG-$KEY.pkg" >> "$GITHUB_ENV"
 
       - name: Installer (Linux .deb -> /opt/ColorHide)
         if: runner.os == 'Linux'
-        run: echo "ASSET=$(packaging/linux/build_deb.sh "$TAG" | tail -1)" >> "$GITHUB_ENV"
+        run: |
+          packaging/linux/build_deb.sh "$TAG"
+          echo "ASSET=ColorHide-$TAG-linux-x64.deb" >> "$GITHUB_ENV"
 
       - name: Installer (Windows setup.exe, Inno Setup)
         if: runner.os == 'Windows'
@@ -136,6 +139,7 @@ jobs:
       - name: Install it for real, then self-test the installed app (macOS)
         if: runner.os == 'macOS'
         run: |
+          test -f "$ASSET"
           sudo installer -pkg "$ASSET" -target /
           /Applications/ColorHide.app/Contents/MacOS/ColorHide --self-test && echo "installed app OK"
 

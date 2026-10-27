@@ -11,7 +11,8 @@ ditto dist/ColorHide.app "$WORK/root/ColorHide.app"
 
 # never "relocate" the install to wherever another copy of the bundle happens to be
 pkgbuild --analyze --root "$WORK/root" "$WORK/component.plist"
-/usr/libexec/PlistBuddy -c "Add :0:BundleIsRelocatable bool false" "$WORK/component.plist"
+/usr/libexec/PlistBuddy -c "Set :0:BundleIsRelocatable false" "$WORK/component.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :0:BundleIsRelocatable bool false" "$WORK/component.plist"
 
 pkgbuild --root "$WORK/root" --component-plist "$WORK/component.plist" \
     --install-location /Applications --scripts "$HERE/scripts" \
