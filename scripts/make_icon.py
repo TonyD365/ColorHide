@@ -102,7 +102,7 @@ def social(icon_img):
             continue
     d.text((590, 210), "Ink", font=font, fill=(240, 238, 232))
     d.text((590 + d.textlength("Ink", font=font), 210), "hue", font=font, fill=ACCENT)
-    d.text((594, 340), "Print color photos as plain black-and-white.\nScan them back to color.",
+    d.text((594, 340), "A black-and-white print\nthat carries its own color.",
            font=small, fill=(170, 172, 178), spacing=12)
     return bg.convert("RGB")
 
