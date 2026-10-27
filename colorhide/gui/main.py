@@ -496,7 +496,7 @@ class Printer(QMainWindow):
         if self.page is None:
             return
         self.say("PRINT SETUP", "CHOOSE PRINTER + OPTIONS")
-        panel = PrintPanel(self, self.page, self.page_dpi, self.printed)
+        panel = PrintPanel(self, self.page, self.page_dpi, self.printed, title=f"ColorHide · {self.source_name}")
         panel.rejected.connect(lambda: self.say("PAGE READY", "PRINT CANCELLED"))
         panel.open()
 

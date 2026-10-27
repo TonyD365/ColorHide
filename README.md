@@ -35,8 +35,9 @@ can read the color back out. No secret key, nothing encrypted — the format is 
 
 - 🖨️ **Printer-style desktop app** for macOS, Windows and Linux
 - 🎨 **Hide color** in a black-and-white page, **reveal color** from a scan
-- 🖨️ **Built-in print panel** — every printer and every driver option (paper, tray, quality, media type,
-  two-sided…), sent straight to the print system at 100 % scale. Or export a lossless **PDF**
+- 🖨️ **Built-in print panel with live preview** — destination (any printer, or Save as PDF), copies, layout,
+  color, paper size, pages per sheet, margins, scale, two-sided, headers and footers, plus every option of the
+  printer's own driver. Jobs go straight to the print system at 100 % scale
 - 🔍 Scan straight from your **scanner or multifunction printer** (ImageKit on macOS, WIA on Windows, SANE on Linux), or import a PDF / image
 - 💾 Export the recovered photo as **PDF, PNG, JPEG, TIFF, WebP, HEIC, JPEG 2000, BMP**…
 - 🧠 Optional **neural refiner** (small U-Net, runs on CPU via ONNX Runtime) removes grain and sharpens color
