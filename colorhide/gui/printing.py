@@ -17,11 +17,15 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PySide6.QtCore import QMarginsF, QSizeF
-from PySide6.QtGui import QPageLayout, QPageSize, QPainter, QPdfWriter
+from PySide6.QtCore import QSizeF
+from PySide6.QtGui import QPageSize, QPainter
 from PySide6.QtPrintSupport import QPrinter, QPrinterInfo
 
-from . import media
+from . import media, sheet
+from .sheet import SheetSettings
+
+# options the panel shows as its own controls; the driver's duplicates are left out of "Printer options"
+STANDARD_KEYS = {"PageSize", "ColorModel", "Duplex", "ColorMode", "Collate"}
 
 
 @dataclass
@@ -62,27 +66,6 @@ def page_size_for(name):
     return None
 
 
-def _fits(page, dpi, ps):
-    w, h = page.shape[1] / dpi, page.shape[0] / dpi
-    pw, ph = ps.size(QPageSize.Inch).width(), ps.size(QPageSize.Inch).height()
-    return (w <= pw and h <= ph) or (w <= ph and h <= pw)
-
-
-def page_pdf(page, dpi, ps, path):
-    """The page centred at 100% on paper `ps`, rotated to landscape if that is how it fits."""
-    img = media.mono(page)
-    w = QPdfWriter(str(path))
-    w.setResolution(dpi)
-    w.setCreator("ColorHide")
-    orient = QPageLayout.Landscape if img.width() > img.height() else QPageLayout.Portrait
-    w.setPageLayout(QPageLayout(ps, orient, QMarginsF(0, 0, 0, 0)))
-    p = QPainter(w)
-    p.setRenderHint(QPainter.SmoothPixmapTransform, False)
-    p.setRenderHint(QPainter.LosslessImageRendering)
-    p.drawImage(media._centered(w.pageLayout().paintRectPixels(dpi), QSizeF(img.width(), img.height())), img)
-    p.end()
-
-
 # ---- CUPS --------------------------------------------------------------------
 
 class PrinterUnreachable(RuntimeError):
@@ -91,7 +74,9 @@ class PrinterUnreachable(RuntimeError):
 
 def _run(*args, timeout=12):
     try:
-        return subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        # printer names/descriptions are not always UTF-8 (e.g. a shared printer "Willis’s" in MacRoman)
+        return subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace",
+                              timeout=timeout)
     except subprocess.TimeoutExpired as ex:
         raise PrinterUnreachable("printer not responding (offline or shared from a computer that is asleep)") from ex
 
@@ -102,7 +87,10 @@ class CupsBackend:
     def printers(self):
         out = []
         for dest in _run("lpstat", "-e").stdout.split():
-            info = dict(kv.split("=", 1) for kv in shlex.split(_run("lpoptions", "-p", dest).stdout) if "=" in kv)
+            try:
+                info = dict(kv.split("=", 1) for kv in shlex.split(_run("lpoptions", "-p", dest).stdout) if "=" in kv)
+            except (PrinterUnreachable, ValueError):  # still list it; options are read (and may fail) later
+                info = {}
             label = info.get("printer-info") or dest.replace("_", " ")
             loc = info.get("printer-location")
             out.append((dest, f"{label}  —  {loc}" if loc else label))
@@ -140,15 +128,16 @@ class CupsBackend:
         sizes = ["Letter", "A4", "Legal", "A5", "4x6", "5x7"]
         return [Option("PageSize", "Media Size", [(s, s) for s in sizes], "Letter")]
 
-    def submit(self, printer, page, dpi, values, copies):
-        ps = page_size_for(values.get("PageSize", "Letter")) or QPageSize(QPageSize.Letter)
-        if not _fits(page, dpi, ps):
-            raise ValueError("page is larger than the chosen paper; reduce the print width")
+    def submit(self, printer, page, dpi, s: SheetSettings, driver, header=None):
+        """driver: -o values for the driver's own options, incl. its color/duplex keys (see describe())."""
+        ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
         pdf = Path(tempfile.mkdtemp(prefix="colorhide-print-")) / "ColorHide page.pdf"
-        page_pdf(page, dpi, ps, pdf)
-        args = ["lp", "-d", printer, "-n", str(copies), "-t", "ColorHide page",
-                "-o", "print-scaling=none", "-o", "fit-to-page=false"]
-        for k, v in values.items():
+        sheet.write_pdf(pdf, media.mono(page), dpi, ps, s, header)
+        args = ["lp", "-d", printer, "-n", str(s.copies), "-t", "ColorHide page",
+                "-o", "print-scaling=none", "-o", "fit-to-page=false", "-o", f"PageSize={s.paper}",
+                "-o", f"print-color-mode={'color' if s.color else 'monochrome'}",
+                "-o", f"sides={'two-sided-long-edge' if s.duplex else 'one-sided'}"]
+        for k, v in driver.items():
             args += ["-o", f"{k}={v}"]
         r = _run(*args, str(pdf))
         if r.returncode != 0:
@@ -180,48 +169,117 @@ class QtBackend:
         opts = [Option("PageSize", "Paper size", sizes, info.defaultPageSize().key() or sizes[0][0])]
         res = [(str(r), f"{r} dpi") for r in sorted(set(info.supportedResolutions()))]
         if res:
-            best = "600" if "600" in dict(res) else res[-1][0]
-            opts.append(Option("Resolution", "Resolution", res, best))
-        dup = [(self.DUPLEX[d].lower().replace(" ", "-"), self.DUPLEX[d]) for d in info.supportedDuplexModes()
-               if d in self.DUPLEX]
-        if len(dup) > 1:
-            opts.append(Option("Duplex", "Two-sided", dup, "off"))
-        colors = {QPrinter.GrayScale: ("gray", "Grayscale"), QPrinter.Color: ("color", "Color")}
-        cm = [colors[c] for c in info.supportedColorModes() if c in colors]
-        if cm:
-            opts.append(Option("ColorMode", "Color mode", cm, "gray" if ("gray", "Grayscale") in cm else cm[0][0]))
-        opts.append(Option("Collate", "Collate", [("true", "On"), ("false", "Off")], "true"))
+            opts.append(Option("Resolution", "Resolution", res, "600" if "600" in dict(res) else res[-1][0]))
+        if len(info.supportedDuplexModes()) > 1:
+            opts.append(Option("Duplex", "Two-sided", [("None", "Off"), ("DuplexNoTumble", "Long edge")], "None"))
+        if QPrinter.Color in info.supportedColorModes():
+            opts.append(Option("ColorModel", "Color", [("Gray", "Gray"), ("RGB", "Color")], "Gray"))
         return opts
 
-    def submit(self, printer, page, dpi, values, copies):
+    def submit(self, printer, page, dpi, s: SheetSettings, driver, header=None):
+        """Must run on the UI thread (QPrinter painting)."""
         info = QPrinterInfo.printerInfo(printer)
-        ps = page_size_for(values.get("PageSize", "Letter")) or QPageSize(QPageSize.Letter)
-        if not _fits(page, dpi, ps):
-            raise ValueError("page is larger than the chosen paper; reduce the print width")
+        ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
+        img = media.mono(page)
+        pl = sheet.place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s)
         pr = QPrinter(info, QPrinter.HighResolution)
         pr.setDocName("ColorHide page")
-        img = media.mono(page)
-        pr.setPageLayout(QPageLayout(ps, QPageLayout.Landscape if img.width() > img.height() else QPageLayout.Portrait,
-                                     QMarginsF(0, 0, 0, 0)))
-        if "Resolution" in values:
-            pr.setResolution(int(values["Resolution"]))
-        inv = {v.lower().replace(" ", "-"): k for k, v in self.DUPLEX.items()}
-        pr.setDuplex(inv.get(values.get("Duplex", "off"), QPrinter.DuplexNone))
-        pr.setColorMode(QPrinter.Color if values.get("ColorMode") == "color" else QPrinter.GrayScale)
-        pr.setCopyCount(copies)
-        pr.setCollateCopies(values.get("Collate", "true") == "true")
-        res = pr.resolution()
-        target = QSizeF(img.width() / dpi * res, img.height() / dpi * res)
+        pr.setFullPage(True)
+        pr.setPageLayout(sheet.page_layout(ps, pl))
+        if "Resolution" in driver:
+            pr.setResolution(int(driver["Resolution"]))
+        pr.setDuplex(QPrinter.DuplexLongSide if s.duplex else QPrinter.DuplexNone)
+        pr.setColorMode(QPrinter.Color if s.color else QPrinter.GrayScale)
+        pr.setCopyCount(s.copies)
+        pr.setCollateCopies(True)
         p = QPainter(pr)
         if not p.isActive():
             raise RuntimeError("printer did not accept the job")
-        p.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        p.drawImage(media._centered(pr.pageLayout().fullRectPixels(res), target), img)
+        sheet.paint(p, pr.resolution(), img, dpi, pl, s, header)
         p.end()
         return "sent"
+
+
+PDF = "__pdf__"  # the "Save as PDF" destination
+PDF_PAPERS = ["Letter", "A4", "Legal", "A5", "A3", "Tabloid", "4x6", "5x7", "8x10"]
+
+
+@dataclass
+class Capabilities:
+    papers: list                      # [(value, label)]
+    paper_default: str
+    color: dict | None = None         # {"key": ..., False: bw value, True: color value} or None
+    duplex: dict | None = None        # {"key": ..., False: off value, True: long-edge value} or None
+    driver: list = field(default_factory=list)  # remaining driver options (Option)
+
+
+def _pick(choices, *prefer):
+    vals = [v for v, _ in choices]
+    return next((p for p in prefer if p in vals), None)
+
+
+def describe(options):
+    """Turn a printer's option list into the panel's standard controls plus leftover driver options."""
+    by = {o.key: o for o in options}
+    page = by.get("PageSize") or Option("PageSize", "Paper", [(p, p) for p in PDF_PAPERS], "Letter")
+    caps = Capabilities(page.choices, page.default)
+    cm = by.get("ColorModel") or by.get("ColorMode")
+    if cm:
+        bw = _pick(cm.choices, "Gray", "DeviceGray", "Grayscale", "gray", "Mono", "Black")
+        col = _pick(cm.choices, "RGB", "DeviceRGB", "CMYK", "Color", "color")
+        if bw and col:
+            caps.color = {"key": cm.key, False: bw, True: col}
+    dp = by.get("Duplex")
+    if dp:
+        off = _pick(dp.choices, "None", "Off", "off")
+        on = _pick(dp.choices, "DuplexNoTumble", "LongEdge", "long-edge")
+        if off and on:
+            caps.duplex = {"key": dp.key, False: off, True: on}
+    caps.driver = [o for o in options if o.key not in STANDARD_KEYS]
+    return caps
+
+
+def pdf_capabilities():
+    return Capabilities([(p, p) for p in PDF_PAPERS], "Letter", color=None, duplex=None)
 
 
 def backend():
     if sys.platform != "win32" and shutil.which("lp") and shutil.which("lpoptions"):
         return CupsBackend()
     return QtBackend()
+
+
+def system_dialog(parent, page, dpi, s: SheetSettings, header=None):
+    """Secondary path: the operating system's own print dialog, with the page laid out the same way."""
+    from dataclasses import replace
+
+    from PySide6.QtGui import QPageLayout
+    from PySide6.QtPrintSupport import QPrintDialog
+    img = media.mono(page)
+    page_in = QSizeF(img.width() / dpi, img.height() / dpi)
+    ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
+    pr = QPrinter(QPrinter.HighResolution)
+    pr.setDocName("ColorHide page")
+    pr.setFullPage(True)
+    pr.setPageLayout(sheet.page_layout(ps, sheet.place(page_in, ps, s)))
+    pr.setCopyCount(s.copies)
+    if QPrintDialog(pr, parent).exec() != QPrintDialog.Accepted:
+        return False
+    # the user may have picked other paper or orientation in the dialog: lay out again for that
+    chosen = pr.pageLayout()
+    s2 = replace(s, layout="landscape" if chosen.orientation() == QPageLayout.Landscape else "portrait")
+    pl = sheet.place(page_in, chosen.pageSize(), s2)
+    p = QPainter(pr)
+    sheet.paint(p, pr.resolution(), img, dpi, pl, s2, header)
+    p.end()
+    return True
+
+
+def open_pdf(page, dpi, s: SheetSettings, header=None):
+    """Write the sheet as a PDF and open it in the system viewer (Preview on macOS)."""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDesktopServices
+    path = Path(tempfile.mkdtemp(prefix="colorhide-print-")) / "ColorHide page.pdf"
+    sheet.write_pdf(path, media.mono(page), dpi, page_size_for(s.paper) or QPageSize(QPageSize.Letter), s, header)
+    QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+    return path
