@@ -96,3 +96,12 @@ def test_photos_keep_full_contrast_documents_get_ink_floor():
     assert not info["ink_floor"]
     _, info = codec.encode(np.ones((200, 300, 3)), factor=8)
     assert info["ink_floor"]
+
+
+def test_400_dpi_scan_is_attempted():
+    """400 dpi decodes with a good print (marginal in general); the too-coarse check must not reject it."""
+    page, _ = api.encode(_photo(300, 450), width_in=4.0, dpi=600)
+    scan = channel.print_scan(page, scale=400 / 600, rotate=1.0, persp=0.003, blur=0.6, dot_gain=0.12,
+                              noise=0.025, gamma=1.05, jpeg=92, seed=1)
+    _, info = api.decode(scan, None)
+    assert info["rs_ok"]

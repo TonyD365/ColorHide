@@ -170,7 +170,7 @@ def find_frame(gray):
     # ring thickness (2 cells); the timing track lengthens it on half the columns, so take a low percentile
     cols = np.linspace(wo * 0.2, wo * 0.8, 64).astype(int)
     cell_px = np.percentile([_ring_end(rough[:, x]) for x in cols], 10) / 2.0
-    if cell_px / K < 0.75:  # under ~450 dpi for a 600 dpi print: single printer dots can't be told apart
+    if cell_px / K < 0.55:  # under ~330 dpi for a 600 dpi print: dots can't be told apart (400 dpi still decodes)
         raise ScanTooCoarse(round(cell_px / K * 600))
     return Frame(src, _grid_count(rough, 1, cell_px, wo), _grid_count(rough, 0, cell_px, ho))
 

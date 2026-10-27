@@ -69,7 +69,7 @@ def place(page_in: QSizeF, ps: QPageSize, s: SheetSettings) -> Placement:
 
 
 def header_lines(title, version, date):
-    return (date, title), (f"Scan in grayscale at 1200 dpi to reveal the color · Inkhue v{version}", "1/1")
+    return (date, title), (f"Scan in grayscale at 600 dpi to reveal the color · Inkhue v{version}", "1/1")
 
 
 def paint(p: QPainter, res, img: QImage, img_dpi, pl: Placement, s: SheetSettings, header=None, smooth=False):

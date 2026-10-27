@@ -561,7 +561,7 @@ class Printer(QMainWindow):
                 open_queue(note.get("queue"))
             return
         self.say("PRINTING", f"{job} · {printer}"[:34])
-        msg = f"Sent to {printer} ({job}). Scan it in grayscale at 1200 dpi to reveal the color."
+        msg = f"Sent to {printer} ({job}). Scan it in grayscale at 600 dpi to reveal the color."
         self.statusBar().showMessage(msg, 20000)
 
     def export_pdf(self):
