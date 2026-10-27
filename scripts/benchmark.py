@@ -23,7 +23,10 @@ from skimage import color as skcolor
 from skimage import data as skdata
 from skimage.metrics import structural_similarity
 
-from inkhue import api, channel, codec, halftone, layout, payload
+try:
+    from inkhue import api, channel, codec, halftone, layout, payload
+except ImportError:  # CI runs this script against the base branch too, which may predate the rename
+    from colorhide import api, channel, codec, halftone, layout, payload
 
 # scikit-image sample photos: public domain / CC0
 IMAGES = ["astronaut", "coffee", "chelsea", "rocket"]
