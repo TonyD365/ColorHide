@@ -96,3 +96,14 @@ def test_photos_keep_full_contrast_documents_get_ink_floor():
     assert not info["ink_floor"]
     _, info = codec.encode(np.ones((200, 300, 3)), factor=8)
     assert info["ink_floor"]
+
+
+def test_400_dpi_scans_decode():
+    """400 dpi is the supported minimum: photos and a mostly white document, typical print/scan."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from benchmark import CONDITIONS, sample_document
+    for rgb in (_photo(300, 450), sample_document()):
+        page, _ = api.encode(rgb, width_in=4.0, dpi=600)
+        _, info = api.decode(channel.print_scan(page, seed=2, **dict(CONDITIONS["typical"], scale=400 / 600)), None)
+        assert info["rs_ok"]
