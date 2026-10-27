@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-TIP = "Scan in Grayscale at 600 dpi (at least 500), with sharpening and descreening off."
+TIP = "Scan in Grayscale at 600 dpi (at least 400), with sharpening and descreening off."
 _keep = []  # live native panels/delegates (otherwise garbage collected mid-scan)
 
 

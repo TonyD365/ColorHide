@@ -58,7 +58,7 @@ class NoHiddenColor(ValueError):
 
 NO_COLOR = ("No hidden color found on this page. Only pages made with Inkhue carry their color: load the "
             "original in HIDE COLOR, print the black-and-white page it makes, then scan that at 600 dpi "
-            "(at least 500). "
+            "(at least 400). "
             "If it is such a page, keep its whole black frame inside the scan and print it at 100 %.")
 
 

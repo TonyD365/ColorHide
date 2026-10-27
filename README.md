@@ -132,7 +132,7 @@ PRs welcome.
 
 - Print at the printer's **native resolution (600 dpi)** and **100 % scale** — turn off *Fit to page* and any photo enhancement.
   Laser printers work best.
-- Scan in **grayscale at 600 dpi** (at least 500), with sharpening and descreening off.
+- Scan in **grayscale at 600 dpi** (at least 400), with sharpening and descreening off.
 - Keep the black frame fully inside the scan.
 
 ## Build from source

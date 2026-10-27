@@ -47,32 +47,53 @@ def _ring_end(profile):
     return start + int(np.argmax(~ink[start:]))
 
 
+def _period(x, lo, hi):
+    """Dominant period (in samples) of signal x between lo and hi, from the FFT peak with parabolic
+    interpolation: measured over the whole track at once, so it doesn't drift like counting does."""
+    x = x - x.mean()
+    spec = np.abs(np.fft.rfft(x * np.hanning(len(x))))
+    n = len(x)
+    f_lo, f_hi = max(1, int(n / hi)), min(len(spec) - 2, int(n / lo) + 1)
+    if f_hi <= f_lo:
+        return None
+    k = f_lo + int(np.argmax(spec[f_lo:f_hi + 1]))
+    a, b, c = spec[k - 1], spec[k], spec[k + 1]
+    shift = 0.5 * (a - c) / (a - 2 * b + c) if (a - 2 * b + c) != 0 else 0.0
+    return n / (k + shift)
+
+
 def _cell_size(profile):
     """Cell size in px along a line through the timing track (alternating 1-cell runs).
-    Robust to pen strokes: runs of the wrong length are dropped and the size comes from a
-    least-squares fit of the remaining run centres, not from counting runs."""
+    First the track's period from its spectrum (one black + one white cell = 2 cells), which stays
+    accurate when a cell is only ~2-3 px (low-resolution scans); then, to resist pen strokes, a
+    least-squares fit of the run centres that agree with it."""
     ink = profile > 0.5
     on = np.flatnonzero(ink)
     if len(on) < 2:
         return None
-    ink = ink[on[0]:on[-1] + 1]  # the outermost pixels can sample paper just outside the frame
+    a, b = on[0], on[-1] + 1
+    ink = ink[a:b]  # the outermost pixels can sample paper just outside the frame
     edges = np.flatnonzero(np.diff(ink.astype(np.int8))) + 1
     starts = np.concatenate([[0], edges])[1:-1]  # drop the runs merged with the ring on both ends
     ends = np.concatenate([edges, [len(ink)]])[1:-1]
     if len(starts) < 8:
         return None
+    inner = profile[a + starts[0]:a + ends[-1]].astype(np.float64)
+    period = _period(inner, 2.4, 0.5 * len(inner))
+    if period is None:
+        return None
+    cell0 = period / 2.0
     lengths = ends - starts
-    cell0 = float(np.median(lengths))
-    good = np.abs(lengths - cell0) < 0.35 * cell0
+    good = np.abs(lengths - cell0) < 0.5 * cell0
     centres = ((starts + ends) / 2.0)[good]
     if len(centres) < 8:
-        return None
+        return cell0
     k = np.concatenate([[0], np.cumsum(np.round(np.diff(centres) / cell0))])  # cell index of each run
     for _ in range(2):  # fit, drop outliers, refit
         cell, c0 = np.polyfit(k, centres, 1)
         keep = np.abs(centres - (c0 + cell * k)) < 0.3 * cell
         k, centres = k[keep], centres[keep]
-    return float(cell)
+    return float(cell) if abs(cell - cell0) < 0.02 * cell0 else cell0
 
 
 def _grid_count(rough, axis, cell_px, length):
@@ -179,8 +200,10 @@ def sample(gray, frame, W, H, oversample=2):
     """The image area resampled to exactly 1 px per printer dot for a W x H cell grid, as float
     darkness (0 = paper, 1 = ink), plus (h, w)."""
     s = oversample
+    # cubic, not linear: at 400 dpi a printer dot is only ~0.7 scan pixels and linear interpolation
+    # blurs the dot positions that carry the data (400 dpi, poor print: 18/24 -> 23/24 decoded)
     fine = cv2.warpPerspective(gray, cv2.getPerspectiveTransform(frame.src, _box(W * K * s, H * K * s)),
-                               (W * K * s, H * K * s), flags=cv2.INTER_LINEAR, borderValue=255)
+                               (W * K * s, H * K * s), flags=cv2.INTER_CUBIC, borderValue=255)
     grid = cv2.resize(fine.astype(np.float32), (W * K, H * K), interpolation=cv2.INTER_AREA).astype(np.float64)
     ink = np.median(grid[: 2 * K, 2 * K:-2 * K])
     paper = np.median(np.concatenate([grid[3 * K:4 * K, 4 * K:-4 * K].ravel(),
