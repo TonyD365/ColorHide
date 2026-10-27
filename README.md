@@ -17,7 +17,7 @@
 
 <img src="assets/compare.png" alt="Original photo, the black-and-white printout, and the color recovered from a scan">
 
-<sub>Left: original. Middle: what gets printed (any black-and-white laser printer). Right: color recovered from the scan.</sub>
+<sub>Left: original. Middle: what gets printed (any black-and-white laser printer; inset: the actual dots). Right: color recovered from the scan at 2× resolution. In the app, double-click any sheet to zoom to full resolution.</sub>
 
 </div>
 
@@ -87,9 +87,9 @@ flowchart LR
 
 | Layer | What it does |
 |---|---|
-| **Data halftone** | Every pixel becomes a 4×4 cell of printer dots (1/150 inch at 600 dpi). *How many* dots are inked sets the gray level; *which corner* they grow from carries 2 bits. The eye only sees gray. |
+| **Data halftone** | Every pixel becomes a 4×4 cell of printer dots (1/150 inch at 600 dpi). *How many* dots are inked sets the gray level; *which corner* the ink leans towards carries 2 bits. Inside each cell the dots are placed where the full-resolution photo is darkest, so edges stay sharp, while the ink's centre of mass still leans clearly enough towards the data corner. The eye only sees gray. |
 | **Color payload** | Cb/Cr at 1/8 resolution, 6-bit, protected by Reed-Solomon and repeated across the page. A fixed, public permutation spreads every byte over the whole sheet so local damage never destroys a region. |
-| **Neural refiner** | A small U-Net trained on [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/) through a simulated print/scan channel. It removes halftone grain, corrects toner spread and sharpens the low-resolution color along luminance edges. |
+| **Neural refiner** | A small U-Net (≈1 M parameters) trained on [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/) through a simulated print/scan channel. It reads the scan dot by dot — including the detail the halftone placed inside each cell — and outputs color at **2× the cell resolution** (300 ppi for a 600 dpi print), removing grain, correcting toner spread and sharpening the color along luminance edges. |
 | **Frame** | A thin border to find the page in a scan and a timing track to count the grid. |
 
 ## Benchmark
@@ -97,12 +97,14 @@ flowchart LR
 Every pull request is benchmarked against `main`: 4 public-domain photos × 3 seeds, through a simulated printer
 and scanner under four conditions ([`scripts/benchmark.py`](scripts/benchmark.py)). Current `main`:
 
-| Condition | Decoded | Raw bit errors | ΔE classic | ΔE neural |
-|---|---|---|---|---|
-| ideal | 100 % | 4.3 % | 2.84 | 4.22 |
-| typical | 100 % | 8.5 % | 5.51 | 3.69 |
-| 600 dpi scan | 92 % | 8.9 % | 4.75 | 3.72 |
-| harsh | 33 % | 21.1 % | 14.19 | 10.64 |
+Print sharpness (SSIM of the page as the eye sees it vs. the photo): **0.242** · neural output: **2× cell resolution**
+
+| Condition | Decoded | Raw bit errors | ΔE classic | ΔE neural | Detail (PSNR @2×) |
+|---|---|---|---|---|---|
+| ideal | 100 % | 4.3 % | 2.81 | 2.98 | 29.1 dB |
+| typical | 100 % | 9.3 % | 5.54 | 3.01 | 28.9 dB |
+| 600 dpi scan | 92 % | 9.5 % | 4.70 | 3.07 | 28.6 dB |
+| harsh | 33 % | 23.3 % | 13.00 | 8.20 | 20.3 dB |
 
 ΔE is CIEDE2000 color error (≈2 is barely visible). Improving *harsh* and *600 dpi scan* is the open challenge —
 PRs welcome.
@@ -134,8 +136,8 @@ Train the refiner (uses Apple GPU / CUDA if available):
 
 ```bash
 pip install -r requirements.txt
-python scripts/make_dataset.py data/div2k/DIV2K_valid_HR --crops 20
-python scripts/train.py --steps 3000
+python scripts/make_dataset.py data/div2k/DIV2K_valid_HR --crops 24 --size 128
+python scripts/train.py --steps 4000
 python -m colorhide.refiner_onnx models/refiner.pt models/refiner.onnx
 ```
 

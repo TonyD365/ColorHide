@@ -1,6 +1,6 @@
-"""Train the refiner on the M-series GPU (MPS).
+"""Train the v2 refiner (printer-dot input, 2x output) on the M-series GPU (MPS).
 
-usage: python scripts/train.py [--steps 3000] [--bs 32] [--crop 128]
+usage: python scripts/train.py [--steps 3000] [--bs 16] [--crop 64]
 """
 import argparse
 import sys
@@ -12,27 +12,30 @@ import torch
 import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from colorhide.refiner import Refiner, device  # noqa: E402
+from colorhide.refiner import Refiner2, device  # noqa: E402
+
+K = 4  # printer dots per cell side
 
 
 def to_gpu(data, idx, dev):
     """Whole split as float16 tensors in (unified) GPU memory: no per-step host copies."""
-    return (torch.from_numpy(data["dots"][idx]).to(dev)[:, None],
+    return (torch.from_numpy(data["grid"][idx]).to(dev)[:, None],
             torch.from_numpy(data["small"][idx]).to(dev).permute(0, 3, 1, 2),
             torch.from_numpy(data["rgb"][idx]).to(dev).permute(0, 3, 1, 2))
 
 
 def batches(gpu, bs, crop, g, factor=8):
-    """Random crops aligned to the chroma cells, random mirror."""
-    dots, small, rgb = gpu
-    n, S = dots.shape[0], dots.shape[-1]
+    """Random crops of `crop` cells aligned to the chroma blocks, random mirror.
+    grid is at K x the cell resolution, the target at 2x."""
+    grid, small, rgb = gpu
+    n, S = grid.shape[0], grid.shape[-1] // K
     while True:
         b = torch.randint(0, n, (bs,), generator=g)
         y0, x0 = (torch.randint(0, (S - crop) // factor + 1, (2,), generator=g) * factor).tolist()
         c0, c1 = y0 // factor, x0 // factor
-        d = dots[b, :, y0:y0 + crop, x0:x0 + crop].float()
+        d = grid[b, :, K * y0:K * (y0 + crop), K * x0:K * (x0 + crop)].float() / 255
         s = small[b, :, c0:c0 + crop // factor, c1:c1 + crop // factor].float()
-        t = rgb[b, :, y0:y0 + crop, x0:x0 + crop].float() / 255
+        t = rgb[b, :, 2 * y0:2 * (y0 + crop), 2 * x0:2 * (x0 + crop)].float() / 255
         if torch.rand(1, generator=g).item() < 0.5:
             d, s, t = d.flip(-1), s.flip(-1), t.flip(-1)
         yield d, s, t
@@ -44,29 +47,29 @@ def psnr(a, b):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data", default="data/train.npz")
+    ap.add_argument("--data", default="data/train2.npz")
     ap.add_argument("--steps", type=int, default=3000)
-    ap.add_argument("--bs", type=int, default=32)
-    ap.add_argument("--crop", type=int, default=128)
+    ap.add_argument("--bs", type=int, default=16)
+    ap.add_argument("--crop", type=int, default=64)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--out", default="models/refiner.pt")
     args = ap.parse_args()
 
     dev = device()
     data = dict(np.load(args.data))
-    n = len(data["dots"])
+    n = len(data["grid"])
     rng = np.random.default_rng(0)
     perm = rng.permutation(n)
     nval = min(max(64, n // 20), n // 5)
     val, tr = perm[:nval], perm[nval:]
     print(f"device {dev}, {len(tr)} train / {len(val)} val samples")
 
-    net = Refiner().to(dev)
+    net = Refiner2().to(dev)
     opt = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, args.lr, total_steps=args.steps, pct_start=0.05)
     gtr = to_gpu(data, tr, dev)
     vd, vs, vt = to_gpu(data, val, dev)
-    vb = (vd.float(), vs.float(), vt.float() / 255)
+    vb = (vd.float() / 255, vs.float(), vt.float() / 255)
     scaler = torch.amp.GradScaler("mps")
 
     @torch.no_grad()
