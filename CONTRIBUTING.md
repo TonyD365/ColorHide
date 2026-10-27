@@ -17,7 +17,7 @@ python3 -m venv .venv
 .venv/bin/python -m inkhue                         # run the app
 .venv/bin/python -m pytest tests                      # tests (the app test runs headless)
 .venv/bin/ruff check .                                # lint
-.venv/bin/python scripts/benchmark.py                 # codec benchmark (~1 min)
+.venv/bin/python scripts/benchmark.py                 # codec benchmark (~2 min): photos + a document, 6 conditions
 ```
 
 ## Pull requests
