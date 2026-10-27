@@ -19,9 +19,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import cv2
 import numpy as np
-from skimage import color as skcolor
-from skimage import data as skdata
-from skimage.metrics import structural_similarity
 
 try:
     from inkhue import api, channel, codec, halftone, layout, payload
@@ -60,6 +57,7 @@ CONDITIONS = {
 
 
 def delta_e(a, b):
+    from skimage import color as skcolor  # scikit-image only when actually benchmarking (tests import this file)
     return float(skcolor.deltaE_ciede2000(skcolor.rgb2lab(a / 255.0), skcolor.rgb2lab(b / 255.0)).mean())
 
 
@@ -69,6 +67,7 @@ def psnr(a, b):
 
 def print_sharpness(page, rgb, cw, ch):
     """The page as the eye sees it at reading distance (Gaussian, sigma 1.5 dots at 600 dpi) vs the photo."""
+    from skimage.metrics import structural_similarity
     k, off = halftone.K, (layout.QUIET + layout.B) * halftone.K
     ink = (page < 128).astype(float)[off:off + ch * k, off:off + cw * k]
     seen = 1 - cv2.GaussianBlur(ink, (0, 0), 1.5)
@@ -82,6 +81,7 @@ def _at(img, w, h):
 
 
 def run():
+    from skimage import data as skdata
     refiner = api.load_refiner()
     rows = []
     for name in IMAGES:
