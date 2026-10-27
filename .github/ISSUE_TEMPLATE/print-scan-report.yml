@@ -1,27 +1,47 @@
-name: Print / scan report
+name: 🖨️ Print / scan report
 description: Share how ColorHide did with your real printer and scanner
 title: "[report] <printer> + <scanner>"
 labels: [real-world-test]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Real printers and scanners are the best test ColorHide can get — thank you!
+        Results are collected under the `real-world-test` label.
   - type: input
     id: printer
-    attributes: { label: Printer (model, laser/inkjet, dpi used) }
-    validations: { required: true }
+    attributes:
+      label: Printer
+      description: Model, laser or inkjet, and the resolution you printed at
+      placeholder: Brother HL-2270DW, laser, 600 dpi
+    validations:
+      required: true
   - type: input
     id: scanner
-    attributes: { label: Scanner (model, dpi, color mode) }
-    validations: { required: true }
+    attributes:
+      label: Scanner
+      description: Model, resolution and color mode
+      placeholder: HP DeskJet 4200 scanner, 1200 dpi, grayscale
+    validations:
+      required: true
   - type: dropdown
     id: result
     attributes:
       label: Did the color come back?
-      options: ["Yes, looks right", "Yes, but damaged / noisy", "No — page not found", "No — other error"]
-    validations: { required: true }
+      options:
+        - Yes, looks right
+        - Yes, but damaged or noisy
+        - No — page not found
+        - No — other error
+    validations:
+      required: true
   - type: input
     id: version
-    attributes: { label: ColorHide version and OS }
+    attributes:
+      label: ColorHide version and OS
+      placeholder: v0.1.0 on macOS 15
   - type: textarea
     id: notes
     attributes:
       label: Notes and images
-      description: The LCD message, settings you changed, and if you can, the scan and the recovered image.
+      description: The LCD message, settings you changed and, if you can, the scan and the recovered image.

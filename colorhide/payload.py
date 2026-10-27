@@ -6,7 +6,7 @@ spread local damage (a smudge, a fold) across the whole codeword and keep the
 dot texture statistically uniform so no pattern becomes visible.
 """
 import numpy as np
-from reedsolo import RSCodec, ReedSolomonError
+from reedsolo import ReedSolomonError, RSCodec
 
 # ============================================================================
 # FORMAT CONSTANTS - DO NOT MODIFY / 格式常量，禁止修改
@@ -110,7 +110,8 @@ def decode_soft(soft, h, w):
         ok = True
     except ReedSolomonError:
         # fall back to the uncorrected bits: a few wrong chroma samples beats no color at all
-        data = bytes(raw[i] for blk in range(0, len(raw), 255) for i in range(blk, min(blk + 255 - BODY_NSYM, len(raw))))
+        k = 255 - BODY_NSYM
+        data = b"".join(raw[blk:min(blk + k, len(raw))] for blk in range(0, len(raw), 255))
         nfixed, ok = -1, False
     q = _unpack(bytes(data), count, qbits).reshape(2, ch, cw)
     info = dict(factor=factor, qbits=qbits, reps=reps, rs_ok=ok, rs_fixed=nfixed)

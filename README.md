@@ -7,7 +7,9 @@
 **Print a color photo as a plain-looking black-and-white page. Scan it, and the color comes back.**
 
 [![Release](https://img.shields.io/github/v/release/TonyD365/ColorHide?color=ee6b33&label=release)](https://github.com/TonyD365/ColorHide/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/TonyD365/ColorHide/release.yml?label=build)](https://github.com/TonyD365/ColorHide/actions/workflows/release.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/TonyD365/ColorHide/ci.yml?branch=main&label=CI)](https://github.com/TonyD365/ColorHide/actions/workflows/ci.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/TonyD365/ColorHide/release.yml?label=release%20build)](https://github.com/TonyD365/ColorHide/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/github/downloads/TonyD365/ColorHide/total?color=6c5ce7)](https://github.com/TonyD365/ColorHide/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-3a7bd5)](LICENSE)
 ![Platforms](https://img.shields.io/badge/macOS%20·%20Windows%20·%20Linux-555)
 
@@ -33,7 +35,8 @@ can read the color back out. No secret key, nothing encrypted — the format is 
 
 - 🖨️ **Printer-style desktop app** for macOS, Windows and Linux
 - 🎨 **Hide color** in a black-and-white page, **reveal color** from a scan
-- 📄 Print with your **system print dialog** (all of its options), or export a lossless **PDF**
+- 🖨️ **Built-in print panel** — every printer and every driver option (paper, tray, quality, media type,
+  two-sided…), sent straight to the print system at 100 % scale. Or export a lossless **PDF**
 - 🔍 Scan straight from your **scanner or multifunction printer** (ImageKit on macOS, WIA on Windows, SANE on Linux), or import a PDF / image
 - 💾 Export the recovered photo as **PDF, PNG, JPEG, TIFF, WebP, HEIC, JPEG 2000, BMP**…
 - 🧠 Optional **neural refiner** (small U-Net, runs on CPU via ONNX Runtime) removes grain and sharpens color
@@ -89,6 +92,21 @@ flowchart LR
 | **Neural refiner** | A small U-Net trained on [DIV2K](https://data.vision.ee.ethz.ch/cvl/DIV2K/) through a simulated print/scan channel. It removes halftone grain, corrects toner spread and sharpens the low-resolution color along luminance edges. |
 | **Frame** | A thin border to find the page in a scan and a timing track to count the grid. |
 
+## Benchmark
+
+Every pull request is benchmarked against `main`: 4 public-domain photos × 3 seeds, through a simulated printer
+and scanner under four conditions ([`scripts/benchmark.py`](scripts/benchmark.py)). Current `main`:
+
+| Condition | Decoded | Raw bit errors | ΔE classic | ΔE neural |
+|---|---|---|---|---|
+| ideal | 100 % | 4.3 % | 2.84 | 4.22 |
+| typical | 100 % | 8.5 % | 5.51 | 3.69 |
+| 600 dpi scan | 92 % | 8.9 % | 4.75 | 3.72 |
+| harsh | 33 % | 21.1 % | 14.19 | 10.64 |
+
+ΔE is CIEDE2000 color error (≈2 is barely visible). Improving *harsh* and *600 dpi scan* is the open challenge —
+PRs welcome.
+
 ## Printing and scanning tips
 
 - Print at the printer's **native resolution (600 dpi)** and **100 % scale** — turn off *Fit to page* and any photo enhancement.
@@ -140,8 +158,9 @@ that still reads the old one.
 
 ## Contributing
 
-Issues and pull requests are welcome — especially **real-world print/scan results** (printer and scanner model,
-settings, and whether it decoded). They are the best way to make the simulator and the refiner better.
+Issues and pull requests are welcome — especially **real-world print/scan results**
+([report template](https://github.com/TonyD365/ColorHide/issues/new?template=print-scan-report.yml)).
+See [CONTRIBUTING.md](CONTRIBUTING.md); security issues go through [SECURITY.md](SECURITY.md).
 
 ## License
 

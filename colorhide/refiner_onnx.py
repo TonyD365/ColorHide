@@ -28,6 +28,7 @@ def load(path):
 
 def export(src, dst):
     import torch
+
     from .refiner import Refiner
     net = Refiner()
     net.load_state_dict(torch.load(src, map_location="cpu"))

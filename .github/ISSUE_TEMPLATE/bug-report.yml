@@ -1,15 +1,36 @@
-name: Bug report
+name: 🐞 Bug report
 description: Something in the app or the codec is broken
-labels: [bug]
+labels: [bug, triage]
 body:
+  - type: markdown
+    attributes:
+      value: Sorry it broke. The version is under the ColorHide logo in the app (e.g. v0.1.0).
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS (Apple silicon), macOS (Intel), Windows, Linux]
+    validations:
+      required: true
   - type: input
     id: version
-    attributes: { label: ColorHide version and OS }
-    validations: { required: true }
+    attributes:
+      label: ColorHide version
+      placeholder: v0.1.0
+    validations:
+      required: true
   - type: textarea
     id: what
-    attributes: { label: What happened, and what did you expect? }
-    validations: { required: true }
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
   - type: textarea
     id: steps
-    attributes: { label: Steps to reproduce }
+    attributes:
+      label: Steps to reproduce
+  - type: textarea
+    id: lcd
+    attributes:
+      label: What did the LCD / status bar say?
+      render: text
