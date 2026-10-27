@@ -4,6 +4,7 @@ import sys
 def self_test():
     """Run the whole codec inside the packaged app; exit code 0 = OK. Used by CI on the built bundle."""
     import numpy as np
+
     from colorhide import api, channel
     y, x = np.mgrid[0:200, 0:300] / np.array([200, 300])[:, None, None]
     rgb = (np.stack([x, y, 1 - x * y], -1) * 255).astype(np.uint8)

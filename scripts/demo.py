@@ -1,6 +1,7 @@
 """Encode sample photos, run them through the simulated print+scan, decode, report quality.
 
-usage: python scripts/demo.py [--size 384] [--factor 8] [--scale 2.0] [--images a.jpg b.png] [--refiner models/refiner.pt]
+usage: python scripts/demo.py [--size 384] [--factor 8] [--scale 2.0] [--images a.jpg b.png]
+                              [--refiner models/refiner.pt]
 """
 import argparse
 import sys
@@ -9,7 +10,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from skimage import color as skcolor, data as skdata
+from skimage import color as skcolor
+from skimage import data as skdata
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from colorhide import channel, codec, payload  # noqa: E402
@@ -71,7 +73,8 @@ def main():
         de = skcolor.deltaE_ciede2000(skcolor.rgb2lab(rgb), skcolor.rgb2lab(out)).mean()
         gray = np.dstack([codec.rgb_to_ycbcr(out)[..., :1]] * 3)
         de_gray = skcolor.deltaE_ciede2000(skcolor.rgb2lab(rgb), skcolor.rgb2lab(np.clip(gray, 0, 1))).mean()
-        print(f"{name:10s} {w}x{h}  raw BER {ber:.3%}  reps {info['reps']}  RS ok={info['rs_ok']} fixed={info['rs_fixed']}  "
+        print(f"{name:10s} {w}x{h}  raw BER {ber:.3%}  reps {info['reps']}  "
+              f"RS ok={info['rs_ok']} fixed={info['rs_fixed']}  "
               f"PSNR {psnr(rgb, out):.1f} dB  ΔE00 {de:.2f} (gray-only {de_gray:.2f})  "
               f"enc+scan {t1 - t:.1f}s dec {t2 - t1:.1f}s")
 

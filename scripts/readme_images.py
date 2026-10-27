@@ -43,7 +43,8 @@ def compare():
     # magnifier: the actual dots
     cy, cx = page.shape[0] // 2, page.shape[1] // 2
     zoom = cv2.resize(page[cy - 40:cy + 40, cx - 40:cx + 40], (150, 150), interpolation=cv2.INTER_NEAREST)
-    zoom = cv2.copyMakeBorder(cv2.cvtColor(zoom, cv2.COLOR_GRAY2RGB), 3, 3, 3, 3, cv2.BORDER_CONSTANT, value=(238, 107, 51))
+    zoom = cv2.copyMakeBorder(cv2.cvtColor(zoom, cv2.COLOR_GRAY2RGB), 3, 3, 3, 3, cv2.BORDER_CONSTANT,
+                              value=(238, 107, 51))
     printed[H - zoom.shape[0] - 10:H - 10, printed.shape[1] - zoom.shape[1] - 10:printed.shape[1] - 10] = zoom
     restored = fit(out)
 
@@ -52,7 +53,8 @@ def compare():
     canvas = Image.new("RGB", (W, H + top + pad), (24, 25, 29))
     d = ImageDraw.Draw(canvas)
     x = pad
-    for img, label in [(orig, "ORIGINAL"), (printed, "PRINTED  ·  BLACK & WHITE"), (restored, "SCANNED  ·  COLOR RESTORED")]:
+    panels = [(orig, "ORIGINAL"), (printed, "PRINTED  ·  BLACK & WHITE"), (restored, "SCANNED  ·  COLOR RESTORED")]
+    for img, label in panels:
         canvas.paste(Image.fromarray(img), (x, top))
         d.text((x, 22), label, font=font(22), fill=(238, 107, 51) if label.startswith("SCANNED") else (200, 200, 205))
         x += img.shape[1] + gap
@@ -62,6 +64,7 @@ def compare():
 def screenshot():
     from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
+
     from colorhide.gui.main import Printer
     app = QApplication([])
     w = Printer()

@@ -1,11 +1,10 @@
-"""Paper in and out: system print dialog, PDF export, PDF/image import. Qt only, so it is
-the same code on macOS, Windows and Linux."""
+"""Paper in and out: PDF export, PDF/image import, colour export. Qt only, so it is the same
+code on macOS, Windows and Linux. Printing lives in printing.py."""
 import cv2
 import numpy as np
 from PySide6.QtCore import QMarginsF, QPointF, QRect, QRectF, QSize, QSizeF, Qt
 from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPainter, QPdfWriter
 from PySide6.QtPdf import QPdfDocument, QPdfDocumentRenderOptions
-from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 
 PAPERS = {"Actual size": None, "US Letter": QPageSize.Letter, "A4": QPageSize.A4}
 
@@ -78,6 +77,10 @@ def render_pdf(path, dpi, gray, max_pixels=250e6):
 
 # ---- writing ----------------------------------------------------------------
 
+def _centered(area, size):
+    return QRectF(QPointF((area.width() - size.width()) / 2, (area.height() - size.height()) / 2), size)
+
+
 def _place(page_px, dpi, target_dpi):
     return QSizeF(page_px.width() / dpi * target_dpi, page_px.height() / dpi * target_dpi)
 
@@ -108,36 +111,8 @@ def export_pdf(page, dpi, paper, path):
     p.setRenderHint(QPainter.LosslessImageRendering)  # PDF output (export, Linux/CUPS printing): no JPEG
     area = w.pageLayout().paintRectPixels(dpi)
     target = _place(img.size(), dpi, dpi)
-    p.drawImage(QRectF(QPointF((area.width() - target.width()) / 2, (area.height() - target.height()) / 2), target), img)
+    p.drawImage(_centered(area, target), img)
     p.end()
-
-
-def print_page(page, dpi, parent):
-    """Opens the operating system's own print dialog (all of its options, incl. the printer's
-    driver features). Returns True if printed. The page is drawn at 100% physical size."""
-    printer = QPrinter(QPrinter.HighResolution)
-    printer.setDocName("ColorHide page")
-    printer.setColorMode(QPrinter.GrayScale)
-    img = mono(page)
-    if img.width() > img.height():
-        printer.setPageOrientation(QPageLayout.Landscape)
-    dlg = QPrintDialog(printer, parent)
-    dlg.setWindowTitle("Print hidden-color page")
-    dlg.setOptions(QPrintDialog.PrintToFile | QPrintDialog.PrintPageRange | QPrintDialog.PrintShowPageSize |
-                   QPrintDialog.PrintCollateCopies | QPrintDialog.PrintCurrentPage | QPrintDialog.PrintSelection)
-    if dlg.exec() != QPrintDialog.Accepted:
-        return False
-    res = printer.resolution()
-    target = _place(img.size(), dpi, res)
-    area = printer.pageLayout().paintRectPixels(res)
-    if target.width() > area.width() + 1 or target.height() > area.height() + 1:
-        raise ValueError("page does not fit the printable area; reduce the print width or change paper")
-    p = QPainter(printer)
-    p.setRenderHint(QPainter.SmoothPixmapTransform, False)
-    p.setRenderHint(QPainter.LosslessImageRendering)  # PDF output (export, Linux/CUPS printing): no JPEG
-    p.drawImage(QRectF(QPointF((area.width() - target.width()) / 2, (area.height() - target.height()) / 2), target), img)
-    p.end()
-    return True
 
 
 # ---- saving the recovered color image -----------------------------------------
@@ -180,5 +155,5 @@ def save_color(rgb, path, paper="Actual size", ppi=150):
     p = QPainter(w)
     p.setRenderHint(QPainter.SmoothPixmapTransform)
     p.setRenderHint(QPainter.LosslessImageRendering)
-    p.drawImage(QRectF(QPointF((area.width() - target.width()) / 2, (area.height() - target.height()) / 2), target), img)
+    p.drawImage(_centered(area, target), img)
     p.end()

@@ -1,0 +1,131 @@
+# Checks every pull request and every push to main:
+#   lint -> tests on macOS / Windows / Linux (incl. the real app window, headless)
+#   -> packaged-app self-test -> codec benchmark vs. the base branch (posted on the PR)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON: "3.12"
+  QT_QPA_PLATFORM: offscreen
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON }}
+      - run: pip install ruff pyyaml
+      - name: ruff
+        run: ruff check . --output-format=github
+      - name: Workflow files parse
+        run: python -c "import glob, yaml; [yaml.safe_load(open(f)) for f in glob.glob('.github/**/*.yml', recursive=True)]"
+
+  test:
+    name: Tests (${{ matrix.os }})
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON }}
+          cache: pip
+          cache-dependency-path: requirements-app.txt
+      - name: Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0 libgl1
+      - run: pip install -r requirements-app.txt pytest
+      - name: pytest (format freeze, codec round trip, updater, app window)
+        run: pytest -q tests
+
+  package:
+    name: Package + self-test
+    needs: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON }}
+          cache: pip
+          cache-dependency-path: requirements-app.txt
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
+      - run: pip install -r requirements-app.txt pyinstaller
+      - run: pyinstaller packaging/ColorHide.spec --noconfirm
+      - name: Packaged app decodes a page
+        run: dist/ColorHide/ColorHide --self-test && du -sh dist/ColorHide
+
+  benchmark:
+    name: Benchmark
+    needs: lint
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: head
+      - uses: actions/checkout@v5
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON }}
+          cache: pip
+          cache-dependency-path: head/requirements-app.txt
+      - run: pip install -r head/requirements-app.txt scikit-image
+      - name: Benchmark this change
+        run: python head/scripts/benchmark.py --out head.json --markdown head.md
+      - name: Benchmark the base branch (same benchmark script)
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p base/scripts && cp head/scripts/benchmark.py base/scripts/benchmark.py
+          python base/scripts/benchmark.py --out base.json
+      - name: Compare
+        if: github.event_name == 'pull_request'
+        run: python head/scripts/benchmark.py --compare base.json head.json --markdown compare.md
+      - name: Job summary
+        run: cat "$( [ -f compare.md ] && echo compare.md || echo head.md )" >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment on the pull request
+        # forks get a read-only token; they still see the table in the job summary
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+                 --jq '[.[] | select(.body | startswith("<!-- colorhide-benchmark -->"))][0].id // empty')
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@compare.md > /dev/null
+          else
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file compare.md
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark
+          path: "*.json"
+      - name: Fail if decoding got worse
+        if: github.event_name == 'pull_request'
+        run: python head/scripts/benchmark.py --compare base.json head.json --fail-on-regression > /dev/null

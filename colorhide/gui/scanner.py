@@ -13,8 +13,19 @@ import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import QProcess
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox, QFormLayout, QLabel,
-                               QLineEdit, QMessageBox, QScrollArea, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 TIP = "Scan in Grayscale at 1200 dpi (at least 900), with sharpening and descreening off."
 _keep = []  # live native panels/delegates (otherwise garbage collected mid-scan)
@@ -35,11 +46,24 @@ def scan(parent, on_done, on_error):
 # ---- macOS -------------------------------------------------------------------
 
 def _scan_macos(on_done, on_error):
-    from AppKit import (NSBackingStoreBuffered, NSMakeRect, NSPanel, NSTextField, NSView,
-                        NSWindowStyleMaskClosable, NSWindowStyleMaskResizable, NSWindowStyleMaskTitled)
-    from Foundation import NSObject, NSURL
-    from Quartz import (IKDeviceBrowserView, IKDeviceBrowserViewDisplayModeTable, IKScannerDeviceView,
-                        IKScannerDeviceViewDisplayModeAdvanced, IKScannerDeviceViewTransferModeFileBased)
+    from AppKit import (
+        NSBackingStoreBuffered,
+        NSMakeRect,
+        NSPanel,
+        NSTextField,
+        NSView,
+        NSWindowStyleMaskClosable,
+        NSWindowStyleMaskResizable,
+        NSWindowStyleMaskTitled,
+    )
+    from Foundation import NSURL, NSObject
+    from Quartz import (
+        IKDeviceBrowserView,
+        IKDeviceBrowserViewDisplayModeTable,
+        IKScannerDeviceView,
+        IKScannerDeviceViewDisplayModeAdvanced,
+        IKScannerDeviceViewTransferModeFileBased,
+    )
 
     out_dir = Path(tempfile.mkdtemp(prefix="colorhide-scan-"))
 
@@ -215,7 +239,7 @@ class SaneDialog(QDialog):
     def start_scan(self):
         path = Path(tempfile.mkdtemp(prefix="colorhide-scan-")) / "scan.png"
         args = ["-d", self.device.currentData(), "--format=png", "-o", str(path)]
-        for flag, (kind, w, unit) in self.fields.items():
+        for flag, (kind, w, _unit) in self.fields.items():
             val = w.currentText() if kind == "choice" else (f"{w.value():g}" if kind == "range" else w.text())
             args += [f"{flag}={val}"] if flag.startswith("--") else [flag, val]
         self.scan_btn.setEnabled(False)

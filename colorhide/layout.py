@@ -40,9 +40,20 @@ def _order(pts):
     return np.array([pts[s.argmin()], pts[d.argmin()], pts[s.argmax()], pts[d.argmax()]], np.float32)
 
 
+def _ring_end(profile):
+    """Inner edge of the ring along a line entering from the frame's edge (skipping paper at the very edge)."""
+    ink = profile > 0.5
+    start = int(np.argmax(ink))
+    return start + int(np.argmax(~ink[start:]))
+
+
 def _count_cells(profile, length):
     """Count grid cells along a line through the timing track."""
     ink = profile > 0.5
+    on = np.flatnonzero(ink)
+    if len(on) == 0:
+        raise ValueError("timing track not found")
+    ink = ink[on[0]:on[-1] + 1]  # the outermost pixels can sample paper just outside the frame
     edges = np.flatnonzero(np.diff(ink.astype(np.int8))) + 1
     runs = np.split(np.arange(len(ink)), edges)
     runs = runs[1:-1]  # drop the runs merged with the ring on both ends
@@ -104,7 +115,7 @@ def locate(gray, oversample=2):
     rough = (paper0 - warped) / max(paper0 - ink0, 1)
     # ring thickness (2 cells); the timing track lengthens it on half the columns, so take a low percentile
     cols = np.linspace(wo * 0.2, wo * 0.8, 64).astype(int)
-    cell_px = np.percentile([np.argmax(rough[:, x] < 0.5) for x in cols], 10) / 2.0
+    cell_px = np.percentile([_ring_end(rough[:, x]) for x in cols], 10) / 2.0
     row = rough[int(round(2.5 * cell_px)), :]
     col = rough[:, int(round(2.5 * cell_px))]
     W = _count_cells(row, wo)

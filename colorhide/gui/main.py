@@ -1,19 +1,42 @@
 """ColorHide desktop app: a printer you feed color photos into and get hidden-color pages out of,
 and the reverse."""
 import sys
-import traceback
 from pathlib import Path
 
-from PySide6.QtCore import (QEasingCurve, QObject, QPoint, QPropertyAnimation, QRectF, QRunnable, Qt,
-                            QThreadPool, QTimer, Signal)
+from PySide6.QtCore import (
+    QEasingCurve,
+    QPoint,
+    QPropertyAnimation,
+    QRectF,
+    Qt,
+    QThreadPool,
+    QTimer,
+)
 from PySide6.QtGui import QColor, QFont, QIcon, QImage, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
-from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFrame, QGraphicsDropShadowEffect, QGridLayout, QHBoxLayout,
-                               QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .. import api, updater
 from .._version import __version__
 from . import media, scanner
+from .jobs import Job
+from .printpanel import PrintPanel
 
 ACCENT = "#ee6b33"
 
@@ -50,36 +73,6 @@ def shadow(widget, radius=24, dy=12, alpha=150):
     e.setOffset(0, dy)
     e.setColor(QColor(0, 0, 0, alpha))
     widget.setGraphicsEffect(e)
-
-
-# ---- background jobs ----------------------------------------------------------
-
-class _Signals(QObject):
-    done = Signal(object)
-    failed = Signal(str)
-    progress = Signal(float)
-
-
-class Job(QRunnable):
-    live = set()  # Python must hold each job (and its signal object) until it has reported back
-
-    def __init__(self, fn, *args, progress=False, quiet=False):
-        super().__init__()
-        self.quiet = quiet
-        self.setAutoDelete(False)
-        self.fn, self.args, self.sig, self.want_progress = fn, args, _Signals(), progress
-        Job.live.add(self)
-        self.sig.done.connect(lambda _: Job.live.discard(self))
-        self.sig.failed.connect(lambda _: Job.live.discard(self))
-
-    def run(self):
-        try:
-            kw = {"progress": self.sig.progress.emit} if self.want_progress else {}
-            self.sig.done.emit(self.fn(*self.args, **kw))
-        except Exception as ex:
-            if not self.quiet:
-                traceback.print_exc()
-            self.sig.failed.emit(str(ex) or type(ex).__name__)
 
 
 # ---- printer parts ------------------------------------------------------------
@@ -359,7 +352,9 @@ class Printer(QMainWindow):
         top.addWidget(self.lcd)
         leds = QVBoxLayout()
         leds.setSpacing(0)
-        self.led_power, self.led_data, self.led_err = LED("POWER", "#3ddc57"), LED("DATA", "#ffa31a"), LED("ERROR", "#ff3b30")
+        self.led_power = LED("POWER", "#3ddc57")
+        self.led_data = LED("DATA", "#ffa31a")
+        self.led_err = LED("ERROR", "#ff3b30")
         self.led_power.set(True)
         for led in (self.led_power, self.led_data, self.led_err):
             leds.addWidget(led)
@@ -491,14 +486,15 @@ class Printer(QMainWindow):
     def print_page(self):
         if self.page is None:
             return
-        self.say("PRINTING", "SCALE 100% · NO FIT TO PAGE")
-        try:
-            if media.print_page(self.page, self.page_dpi, self):
-                self.say("SENT TO PRINTER", "SCAN AT 1200 DPI TO REVEAL")
-            else:
-                self.say("PAGE READY", "PRINT CANCELLED")
-        except Exception as ex:
-            self.fail(str(ex))
+        self.say("PRINT SETUP", "CHOOSE PRINTER + OPTIONS")
+        panel = PrintPanel(self, self.page, self.page_dpi, self.printed)
+        panel.rejected.connect(lambda: self.say("PAGE READY", "PRINT CANCELLED"))
+        panel.open()
+
+    def printed(self, printer, job):
+        self.say("PRINTING", f"{job} · {printer}"[:34])
+        msg = f"Sent to {printer} ({job}). Scan it in grayscale at 1200 dpi to reveal the color."
+        self.statusBar().showMessage(msg, 20000)
 
     def export_pdf(self):
         if self.page is None:
