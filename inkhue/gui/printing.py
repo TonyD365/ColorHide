@@ -128,11 +128,11 @@ class CupsBackend:
         sizes = ["Letter", "A4", "Legal", "A5", "4x6", "5x7"]
         return [Option("PageSize", "Media Size", [(s, s) for s in sizes], "Letter")]
 
-    def submit(self, printer, page, dpi, s: SheetSettings, driver, header=None):
+    def submit(self, printer, pages, dpi, s: SheetSettings, driver, header=None):
         """driver: -o values for the driver's own options, incl. its color/duplex keys (see describe())."""
         ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
         pdf = Path(tempfile.mkdtemp(prefix="inkhue-print-")) / "Inkhue page.pdf"
-        sheet.write_pdf(pdf, media.mono(page), dpi, ps, s, header)
+        sheet.write_pdf(pdf, media.mono_pages(pages), dpi, ps, s, header)
         args = ["lp", "-d", printer, "-n", str(s.copies), "-t", "Inkhue page",
                 "-o", "print-scaling=none", "-o", "fit-to-page=false", "-o", f"PageSize={s.paper}",
                 "-o", f"print-color-mode={'color' if s.color else 'monochrome'}",
@@ -193,16 +193,16 @@ class QtBackend:
             opts.append(Option("ColorModel", "Color", [("Gray", "Gray"), ("RGB", "Color")], "Gray"))
         return opts
 
-    def submit(self, printer, page, dpi, s: SheetSettings, driver, header=None):
+    def submit(self, printer, pages, dpi, s: SheetSettings, driver, header=None):
         """Must run on the UI thread (QPrinter painting)."""
         info = QPrinterInfo.printerInfo(printer)
         ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
-        img = media.mono(page)
-        pl = sheet.place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s)
+        imgs = media.mono_pages(pages)
+        pls = [sheet.place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s) for img in imgs]
         pr = QPrinter(info, QPrinter.HighResolution)
         pr.setDocName("Inkhue page")
         pr.setFullPage(True)
-        pr.setPageLayout(sheet.page_layout(ps, pl))
+        pr.setPageLayout(sheet.page_layout(ps, pls[0]))
         if "Resolution" in driver:
             pr.setResolution(int(driver["Resolution"]))
         pr.setDuplex(QPrinter.DuplexLongSide if s.duplex else QPrinter.DuplexNone)
@@ -212,7 +212,11 @@ class QtBackend:
         p = QPainter(pr)
         if not p.isActive():
             raise RuntimeError("printer did not accept the job")
-        sheet.paint(p, pr.resolution(), img, dpi, pl, s, header)
+        for i, (img, pl) in enumerate(zip(imgs, pls)):
+            if i:
+                pr.setPageLayout(sheet.page_layout(ps, pl))
+                pr.newPage()
+            sheet.paint(p, pr.resolution(), img, dpi, pl, s, header)
         p.end()
         return "sent"
 
@@ -266,14 +270,14 @@ def backend():
     return QtBackend()
 
 
-def system_dialog(parent, page, dpi, s: SheetSettings, header=None):
+def system_dialog(parent, pages, dpi, s: SheetSettings, header=None):
     """Secondary path: the operating system's own print dialog, with the page laid out the same way."""
     from dataclasses import replace
 
     from PySide6.QtGui import QPageLayout
     from PySide6.QtPrintSupport import QPrintDialog
-    img = media.mono(page)
-    page_in = QSizeF(img.width() / dpi, img.height() / dpi)
+    imgs = media.mono_pages(pages)
+    page_in = QSizeF(imgs[0].width() / dpi, imgs[0].height() / dpi)
     ps = page_size_for(s.paper) or QPageSize(QPageSize.Letter)
     pr = QPrinter(QPrinter.HighResolution)
     pr.setDocName("Inkhue page")
@@ -285,19 +289,23 @@ def system_dialog(parent, page, dpi, s: SheetSettings, header=None):
     # the user may have picked other paper or orientation in the dialog: lay out again for that
     chosen = pr.pageLayout()
     s2 = replace(s, layout="landscape" if chosen.orientation() == QPageLayout.Landscape else "portrait")
-    pl = sheet.place(page_in, chosen.pageSize(), s2)
+    pls = [sheet.place(QSizeF(img.width() / dpi, img.height() / dpi), chosen.pageSize(), s2) for img in imgs]
     p = QPainter(pr)
-    sheet.paint(p, pr.resolution(), img, dpi, pl, s2, header)
+    for i, (img, pl) in enumerate(zip(imgs, pls)):
+        if i:
+            pr.newPage()
+        sheet.paint(p, pr.resolution(), img, dpi, pl, s2, header)
     p.end()
     return True
 
 
-def open_pdf(page, dpi, s: SheetSettings, header=None):
+def open_pdf(pages, dpi, s: SheetSettings, header=None):
     """Write the sheet as a PDF and open it in the system viewer (Preview on macOS)."""
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QDesktopServices
     path = Path(tempfile.mkdtemp(prefix="inkhue-print-")) / "Inkhue page.pdf"
-    sheet.write_pdf(path, media.mono(page), dpi, page_size_for(s.paper) or QPageSize(QPageSize.Letter), s, header)
+    sheet.write_pdf(path, media.mono_pages(pages), dpi, page_size_for(s.paper) or QPageSize(QPageSize.Letter), s,
+                    header)
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
     return path
 

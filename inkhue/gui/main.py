@@ -51,6 +51,7 @@ from .printpanel import PrintPanel
 from .viewer import Viewer
 
 ACCENT = "#ee6b33"
+MANY_PAGES = 20  # warn before converting a PDF longer than this
 
 QSS = f"""
 #desk {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #292c31, stop:1 #141519); }}
@@ -75,6 +76,10 @@ QPushButton.mode {{ color: #999; font-size: 10px; font-weight: 900; letter-spaci
     border-radius: 6px; background: transparent; min-height: 26px; }}
 QPushButton.mode:checked {{ color: black; background: #d9d9d9; }}
 #modebar {{ background: rgba(0,0,0,0.45); border-radius: 8px; }}
+#turn {{ color: #ddd; font-size: 26px; font-weight: 700; background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15); border-radius: 22px; padding-bottom: 4px; }}
+#turn:hover {{ background: rgba(255,255,255,0.18); }}
+#turn:disabled {{ color: #555; background: transparent; }}
 #shell QLabel, #shell QCheckBox {{ color: #333; }}
 """
 
@@ -235,9 +240,9 @@ class InputTray(QWidget):
 
 
 class OutputTray(QWidget):
-    """The area under the output slot; the sheet slides out of the top edge."""
+    """The area under the output slot; the sheet slides out of the top edge. ‹ › turn the pages."""
 
-    def __init__(self):
+    def __init__(self, on_turn):
         super().__init__()
         self.setFixedSize(900, 350)
         self.paper = Paper(560, 330)
@@ -246,6 +251,20 @@ class OutputTray(QWidget):
         self.anim = QPropertyAnimation(self.paper, b"pos", self)
         self.anim.setDuration(1100)
         self.anim.setEasingCurve(QEasingCurve.OutCubic)
+        self.turn = []
+        for x, step, text in [(100, -1, "‹"), (756, 1, "›")]:
+            b = QPushButton(text, self, objectName="turn")
+            b.setFixedSize(44, 44)
+            b.move(x, 150)
+            b.setCursor(Qt.PointingHandCursor)
+            b.clicked.connect(lambda _=False, step=step: on_turn(step))
+            b.hide()
+            self.turn.append(b)
+
+    def nav(self, count, at):
+        for b, show, on in zip(self.turn, (count > 1, count > 1), (at > 0, at < count - 1)):
+            b.setVisible(show)
+            b.setEnabled(on)
 
     def eject(self, img, caption):
         self.paper.set_image(img, caption)
@@ -260,6 +279,16 @@ class OutputTray(QWidget):
     def clear(self):
         self.anim.stop()
         self.paper.hide()
+        self.nav(0, 0)
+
+
+def thumb(img, side=1600):
+    """A copy small enough to keep for every page of a long PDF (the trays and the zoom view)."""
+    if max(img.width(), img.height()) <= side:
+        return img
+    if img.format() == QImage.Format_Mono:
+        img = img.convertToFormat(QImage.Format_Grayscale8)
+    return img.scaled(side, side, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
 
 def key(text, accent=False):
@@ -286,7 +315,9 @@ class Printer(QMainWindow):
         self.setWindowTitle("Inkhue")
         self.pool = QThreadPool.globalInstance()
         self.mode = self.HIDE
-        self.page = self.page_dpi = self.color = None
+        self.pages, self.colors, self.sources = [], [], []  # 1-bit pages; decoded photos; input-tray previews
+        self.at, self.out = 0, None  # page shown, and what the output tray holds: "pages" or "colors"
+        self.page_dpi = None
         self.source_name = "photo"
         self.busy = False
         self.refiner = None
@@ -323,7 +354,7 @@ class Printer(QMainWindow):
         sv.addWidget(slot, 0, Qt.AlignHCenter)
         col.addWidget(shell, 0, Qt.AlignHCenter)
 
-        self.tray_out = OutputTray()
+        self.tray_out = OutputTray(self.turn)
         col.addWidget(self.tray_out, 0, Qt.AlignHCenter)
         col.addStretch(1)
         self.setCentralWidget(desk)
@@ -447,8 +478,8 @@ class Printer(QMainWindow):
         self.k_import.setEnabled(idle)
         self.k_scan.setEnabled(idle)
         for b in (self.k_print, self.k_pdf, self.k_test):
-            b.setEnabled(idle and self.page is not None)
-        self.k_save.setEnabled(idle and self.color is not None)
+            b.setEnabled(idle and bool(self.pages))
+        self.k_save.setEnabled(idle and any(c is not None for c in self.colors))
         self.led_data.set(self.busy, blink=True)
 
     def set_mode(self, m, keep=False):
@@ -486,6 +517,61 @@ class Printer(QMainWindow):
             job.sig.progress.connect(progress)
         self.pool.start(job)
 
+    @property
+    def page(self):
+        """The page on show, as an array (0 ink / 255 paper)."""
+        return media.qimage_to_array(self.pages[self.at], gray=True) if self.pages else None
+
+    @property
+    def color(self):
+        return self.colors[self.at] if self.colors else None
+
+    def count_pages(self, path):
+        """Pages to convert, after asking when there are many; None to stop."""
+        try:
+            n = media.page_count(path)
+        except Exception as ex:
+            self.fail(str(ex))
+            return None
+        if n > MANY_PAGES:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Information)
+            box.setWindowTitle("Many pages")
+            box.setText(f"This PDF has {n} pages.")
+            box.setInformativeText("That's quite a lot: converting every page will take a while. Continue?")
+            go = box.addButton("Convert All", QMessageBox.AcceptRole)
+            box.addButton("Cancel", QMessageBox.RejectRole)
+            box.exec()
+            if box.clickedButton() is not go:
+                self.say("READY", "CANCELLED")
+                return None
+        return n
+
+    def page_progress(self, title, n):
+        return lambda f: n > 1 and self.say(title, f"PAGE {round(f * n) + 1} OF {n}")
+
+    def turn(self, step):
+        n = len(self.pages if self.out == "pages" else self.colors)
+        self.at = max(0, min(n - 1, self.at + step))
+        self.show_output()
+
+    def show_output(self, eject=False):
+        n = len(self.pages if self.out == "pages" else self.colors)
+        of = f" {self.at + 1} OF {n}" if n > 1 else ""
+        if self.out == "pages":
+            img, caption = self.pages[self.at], f"HIDDEN-COLOR PAGE{of}  ·  DOUBLE-CLICK TO SEE THE DOTS"
+        elif self.colors[self.at] is None:  # this page of a longer scan carried no color
+            img, caption = None, f"PAGE{of}"
+        else:
+            rgb = self.colors[self.at]
+            img = media.rgb_to_qimage(rgb)
+            caption = f"RECOVERED COLOR{of}  ·  {rgb.shape[1]} × {rgb.shape[0]} PX  ·  DOUBLE-CLICK TO ZOOM"
+        self.tray_out.paper.placeholder = "NO HIDDEN COLOR ON THIS PAGE" if img is None else ""
+        (self.tray_out.eject if eject else self.tray_out.paper.set_image)(img, caption)
+        self.tray_out.nav(n, self.at)
+        if self.at < len(self.sources):
+            self.tray_in.paper.set_image(self.sources[self.at])
+
     def fail(self, msg):
         if msg.startswith(api.NO_COLOR[:30]):
             self.say("NO HIDDEN COLOR", "MAKE IT WITH HIDE COLOR FIRST", fault=True)
@@ -507,35 +593,47 @@ class Printer(QMainWindow):
             self.handle_file(path)
 
     def feed(self, path):
+        n = self.count_pages(path)
+        if n is None:
+            return
         self.source_name = Path(path).stem
         width, dpi = self.width_in.value(), int(self.dpi.currentText())
         paper = media.PAPERS.get(self.paper.currentText())
         fill = self.fill.isChecked() and paper is not None
 
-        def work():
-            rgb = media.read_image(path, gray=False)
-            w = sheet.fill_width(rgb.shape[0] / rgb.shape[1], QPageSize(paper), dpi) if fill else width
-            page, info = api.encode(rgb, w, dpi)
-            return rgb, page, info, w
+        def work(progress):
+            pages, sources, first = [], [], None
+            for i in range(n):
+                progress(i / n)
+                rgb = media.read_image(path, gray=False, page=i)
+                w = sheet.fill_width(rgb.shape[0] / rgb.shape[1], QPageSize(paper), dpi) if fill else width
+                page, info = api.encode(rgb, w, dpi)
+                pages.append(media.mono(page))
+                sources.append(thumb(media.rgb_to_qimage(rgb)))
+                first = first or (info, w)
+            return pages, sources, first
 
         def done(r):
-            rgb, page, info, w = r
+            pages, sources, (info, w) = r
             if fill:
                 self.width_in.setValue(w)
-            self.page, self.page_dpi, self.color = page, dpi, None
-            self.tray_in.paper.set_image(media.rgb_to_qimage(rgb))
-            self.tray_out.eject(media.gray_to_qimage(page), "HIDDEN-COLOR PAGE  ·  DOUBLE-CLICK TO SEE THE DOTS")
-            self.say("PAGE READY", f"{info['width_in']:.2f} x {info['height_in']:.2f} IN @ {dpi} DPI")
+            self.pages, self.sources, self.colors, self.page_dpi = pages, sources, [], dpi
+            self.at, self.out = 0, "pages"
+            self.show_output(eject=True)
+            if len(pages) == 1:
+                self.say("PAGE READY", f"{info['width_in']:.2f} x {info['height_in']:.2f} IN @ {dpi} DPI")
+            else:
+                self.say("PAGES READY", f"{len(pages)} PAGES @ {dpi} DPI")
             self.refresh_keys()
 
-        self.run("ENCODING", work, done=done)
+        self.run("ENCODING", work, done=done, progress=self.page_progress("ENCODING", n))
 
     def print_page(self):
-        if self.page is None:
+        if not self.pages:
             return
         self.say("PRINT SETUP", "CHOOSE PRINTER + OPTIONS")
         paper = {"US Letter": "Letter", "A4": "A4"}.get(self.paper.currentText())
-        panel = PrintPanel(self, self.page, self.page_dpi, self.printed, title=f"Inkhue · {self.source_name}",
+        panel = PrintPanel(self, self.pages, self.page_dpi, self.printed, title=f"Inkhue · {self.source_name}",
                            paper=paper)
         panel.rejected.connect(lambda: self.say("PAGE READY", "PRINT CANCELLED"))
         panel.open()
@@ -565,65 +663,89 @@ class Printer(QMainWindow):
         self.statusBar().showMessage(msg, 20000)
 
     def export_pdf(self):
-        if self.page is None:
+        if not self.pages:
             return
         path, _ = QFileDialog.getSaveFileName(self, "Export PDF", f"{self.source_name}-inkhue.pdf", "PDF (*.pdf)")
         if not path:
             return
         try:
-            media.export_pdf(self.page, self.page_dpi, self.paper.currentText(), path)
+            media.export_pdf(self.pages, self.page_dpi, self.paper.currentText(), path)
             self.say("PDF SAVED", Path(path).name)
         except Exception as ex:
             self.fail(str(ex))
 
     def test_cycle(self):
         """Software print + scan, then decode: tries the whole loop without hardware."""
-        if self.page is None:
+        if not self.pages:
             return
         from .. import channel
-        page = self.page
-
-        def done(scan):
-            self.set_mode(self.REVEAL, keep=True)
-            self.reveal(scan)
-
-        self.run("SIMULATING", lambda: channel.print_scan(page, scale=2.0), done=done)
+        pages = list(self.pages)
+        self.set_mode(self.REVEAL, keep=True)
+        self.reveal(lambda i: channel.print_scan(media.qimage_to_array(pages[i], gray=True), scale=2.0),
+                    len(pages), "SIMULATING")
 
     # -- reveal color --
     def import_page(self, path):
+        n = self.count_pages(path)
+        if n is None:
+            return
         self.source_name = Path(path).stem
-        self.run("READING PAGE", lambda: media.read_image(path, gray=True), done=self.reveal)
+        self.reveal(lambda i: media.read_image(path, gray=True, page=i), n)
 
     def scan(self):
         self.say("SCANNER", "CHOOSE A DEVICE")
         scanner.scan(self, on_done=self.import_page, on_error=self.fail)
 
-    def reveal(self, gray):
-        self.tray_in.paper.set_image(media.gray_to_qimage(gray))
+    def reveal(self, read, n, title="DECODING"):
+        """read(i) gives scanned page i (gray array); runs in the background."""
         use_net = self.use_net.isChecked()
 
-        def work():
+        def work(progress):
             if use_net and self.refiner is None:
                 self.refiner = api.load_refiner()
-            return api.decode(gray, self.refiner if use_net else None)
+            colors, scans, infos, first_error = [], [], [], None
+            for i in range(n):
+                progress(i / n)
+                gray = read(i)
+                scans.append(thumb(media.gray_to_qimage(gray)))
+                try:
+                    rgb, info = api.decode(gray, self.refiner if use_net else None)
+                except ValueError as ex:
+                    if n == 1:
+                        raise
+                    rgb, info, first_error = None, None, first_error or str(ex)  # keep going with the rest
+                colors.append(rgb)
+                infos.append(info)
+            if all(c is None for c in colors):
+                raise ValueError(first_error)
+            return colors, scans, infos
 
         def done(r):
-            rgb, info = r
-            self.color = rgb
-            scale = round(rgb.shape[1] / info["cells"][0])
-            self.tray_out.eject(media.rgb_to_qimage(rgb), f"RECOVERED COLOR  ·  {rgb.shape[1]} × {rgb.shape[0]} PX"
-                                "  ·  DOUBLE-CLICK TO ZOOM")
-            how = f"NEURAL {scale}X" if use_net and self.refiner else "CLASSIC"
-            if info["rs_ok"]:
-                self.say("COLOR RESTORED", f"{how} · {info['reps']}X REDUNDANCY")
-            else:  # damaged parts stay gray instead of random colors
-                self.say("PARTLY RESTORED", f"{info['damaged']:.0%} LEFT GRAY · DAMAGED", fault=True)
+            colors, scans, infos = r
+            self.colors, self.sources, self.at, self.out = colors, scans, 0, "colors"
+            self.show_output(eject=True)
+            if n == 1:
+                info = infos[0]
+                scale = round(colors[0].shape[1] / info["cells"][0])
+                how = f"NEURAL {scale}X" if use_net and self.refiner else "CLASSIC"
+                if info["rs_ok"]:
+                    self.say("COLOR RESTORED", f"{how} · {info['reps']}X REDUNDANCY")
+                else:  # damaged parts stay gray instead of random colors
+                    self.say("PARTLY RESTORED", f"{info['damaged']:.0%} LEFT GRAY · DAMAGED", fault=True)
+            else:
+                ok = sum(i is not None and i["rs_ok"] for i in infos)
+                if ok == n:
+                    self.say("COLOR RESTORED", f"ALL {n} PAGES")
+                else:
+                    missing = sum(i is None for i in infos)
+                    self.say("PARTLY RESTORED", f"{ok} OF {n} PAGES OK · {missing} WITHOUT COLOR", fault=True)
             self.refresh_keys()
 
-        self.run("DECODING", work, done=done)
+        self.run(title, work, done=done, progress=self.page_progress(title, n))
 
     def save_color(self):
-        if self.color is None:
+        colors = [c for c in self.colors if c is not None]
+        if not colors:
             return
         filters = media.color_save_filters()
         path, chosen = QFileDialog.getSaveFileName(self, "Export color image", f"{self.source_name}-color.png",
@@ -633,8 +755,9 @@ class Printer(QMainWindow):
         if "." not in Path(path).name:  # some platforms don't append the extension of the chosen filter
             path += "." + chosen.split("*.")[1].split()[0].rstrip(")")
         try:
-            media.save_color(self.color, path, self.paper.currentText())
-            self.say("EXPORTED", Path(path).name)
+            media.save_color(colors, path, self.paper.currentText())
+            self.say("EXPORTED", Path(path).name if len(colors) == 1 or path.lower().endswith(".pdf")
+                     else f"{len(colors)} FILES")
         except Exception as ex:
             self.fail(str(ex))
 

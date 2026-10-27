@@ -4,7 +4,7 @@ own options). Jobs go straight to the print system (see printing.py), or into a 
 import sys
 
 from PySide6.QtCore import QDateTime, QSizeF, Qt, QThreadPool, QTimer
-from PySide6.QtGui import QColor, QPageSize, QPainter
+from PySide6.QtGui import QColor, QImage, QPageSize, QPainter
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -109,17 +109,18 @@ class Preview(QWidget):
 
 
 class PrintPanel(QDialog):
-    def __init__(self, parent, page, dpi, on_sent, title="Inkhue page", paper=None):
+    def __init__(self, parent, pages, dpi, on_sent, title="Inkhue page", paper=None):
         super().__init__(parent)
-        self.page, self.dpi, self.on_sent = page, dpi, on_sent
+        self.pages, self.dpi, self.on_sent = media.mono_pages(pages), dpi, on_sent  # one page or a list
         self.wanted_paper = paper  # the paper the page was sized for, preselected when the printer has it
         self.backend = printing.backend()
         self.caps = printing.pdf_capabilities()
         self.driver, self.problem = {}, None
         date = QDateTime.currentDateTime().toString("M/d/yy, h:mm AP")
         self.header = sheet.header_lines(title, __version__, date)
-        self.page_in = QSizeF(page.shape[1] / dpi, page.shape[0] / dpi)
-        self.thumb = media.gray_to_qimage(page).scaled(
+        first = self.pages[0]  # the preview shows the first page
+        self.page_in = QSizeF(first.width() / dpi, first.height() / dpi)
+        self.thumb = first.convertToFormat(QImage.Format_Grayscale8).scaled(
             round(self.page_in.width() * THUMB_DPI), round(self.page_in.height() * THUMB_DPI),
             Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.setWindowTitle("Print")
@@ -345,7 +346,9 @@ class PrintPanel(QDialog):
     def update_preview(self):
         s = self.settings()
         self.custom.setVisible(s.scale == "custom")
-        self.sheets.setText(f"{s.copies} sheet{'s' if s.copies != 1 else ''} of paper")
+        n = s.copies * len(self.pages)
+        pages = f"{len(self.pages)} pages · " if len(self.pages) > 1 else ""
+        self.sheets.setText(f"{pages}{n} sheet{'s' if n != 1 else ''} of paper")
         pl = None
         try:
             img, pl = sheet.preview(self.thumb, THUMB_DPI, self.page_in, self.page_size(s), s, res=110,
@@ -381,7 +384,7 @@ class PrintPanel(QDialog):
             if not path:
                 return
             try:
-                sheet.write_pdf(path, media.mono(self.page), self.dpi, self.page_size(s), s, self.header)
+                sheet.write_pdf(path, self.pages, self.dpi, self.page_size(s), s, self.header)
             except Exception as ex:
                 self.status.setText(f"⚠ {ex}")
                 return
@@ -390,7 +393,7 @@ class PrintPanel(QDialog):
             return
         self.go.setEnabled(False)
         self.status.setText("Sending to printer…")
-        args = (pid, self.page, self.dpi, s, self.driver_values(s), self.header)
+        args = (pid, self.pages, self.dpi, s, self.driver_values(s), self.header)
         name = self.dest.currentText()
         if self.backend.name == "Qt":  # QPrinter painting belongs on the UI thread
             try:
@@ -409,7 +412,7 @@ class PrintPanel(QDialog):
 
     def system_dialog(self):
         try:
-            if printing.system_dialog(self, self.page, self.dpi, self.settings(), self.header):
+            if printing.system_dialog(self, self.pages, self.dpi, self.settings(), self.header):
                 self.accept()
                 self.on_sent("system dialog", "sent")
         except Exception as ex:
@@ -417,6 +420,6 @@ class PrintPanel(QDialog):
 
     def open_pdf(self):
         try:
-            printing.open_pdf(self.page, self.dpi, self.settings(), self.header)
+            printing.open_pdf(self.pages, self.dpi, self.settings(), self.header)
         except Exception as ex:
             self.status.setText(f"⚠ {ex}")

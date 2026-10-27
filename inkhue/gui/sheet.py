@@ -99,18 +99,23 @@ def page_layout(ps: QPageSize, pl: Placement):
     return QPageLayout(ps, QPageLayout.Landscape if pl.landscape else QPageLayout.Portrait, QMarginsF(0, 0, 0, 0))
 
 
-def write_pdf(path, img: QImage, dpi, ps: QPageSize, s: SheetSettings, header=None):
-    """The sheet as a PDF (lossless 1-bit page image). Returns the placement used."""
-    pl = place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s)
+def write_pdf(path, imgs, dpi, ps: QPageSize, s: SheetSettings, header=None):
+    """The sheet(s) as a PDF (lossless 1-bit page images), one sheet per page. Returns the first placement."""
+    imgs = imgs if isinstance(imgs, (list, tuple)) else [imgs]
+    pls = [place(QSizeF(img.width() / dpi, img.height() / dpi), ps, s) for img in imgs]  # all fit, or nothing
     w = QPdfWriter(str(path))
     w.setResolution(dpi)
     w.setCreator("Inkhue")
     w.setTitle("Inkhue page")
-    w.setPageLayout(page_layout(ps, pl))
+    w.setPageLayout(page_layout(ps, pls[0]))
     p = QPainter(w)
-    paint(p, dpi, img, dpi, pl, s, header)
+    for i, (img, pl) in enumerate(zip(imgs, pls)):
+        if i:
+            w.setPageLayout(page_layout(ps, pl))  # takes effect on the new page
+            w.newPage()
+        paint(p, dpi, img, dpi, pl, s, header)
     p.end()
-    return pl
+    return pls[0]
 
 
 def preview(img_thumb: QImage, thumb_dpi, page_in: QSizeF, ps: QPageSize, s: SheetSettings, res, header=None):
